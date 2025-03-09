@@ -1,7 +1,9 @@
 name: SIGAA Grade Scraper
 
 on:
-  workflow_dispatch:      # Permite rodar manualmente
+  schedule:
+    - cron: "0 12 * * *"  # Roda todo dia às 12:00 UTC
+  workflow_dispatch:
 
 jobs:
   scrape-grades:
@@ -12,7 +14,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Configura cache pras dependências Python
+      # Cache pras dependências Python
       - name: Cache Python dependencies
         uses: actions/cache@v4
         with:
@@ -27,13 +29,13 @@ jobs:
         with:
           python-version: "3.10"
 
-      # Instala dependências (usando cache se disponível)
+      # Instala dependências (usa cache se disponível)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install playwright beautifulsoup4 lxml requests python-dotenv
 
-      # Configura cache pros binários do Playwright
+      # Cache pros binários do Playwright
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
@@ -47,12 +49,12 @@ jobs:
         run: |
           playwright install chromium
 
-      # Configura cache pro grades_cache.json
+      # Cache pro grades_cache.json
       - name: Cache grades_cache.json
         uses: actions/cache@v4
         with:
           path: grades_cache.json
-          key: ${{ runner.os }}-grades-cache-${{ github.run_id }}
+          key: ${{ runner.os }}-grades-cache-${{ github.sha }}  # Usa o SHA do commit pra persistência
           restore-keys: |
             ${{ runner.os }}-grades-cache-
 
@@ -74,13 +76,3 @@ jobs:
       # Roda o script principal
       - name: Run SIGAA Scraper
         run: python sigaa-scraper.py
-
-      # Garante que o grades_cache.json seja salvo no repositório (opcional)
-      - name: Commit grades_cache.json changes
-        if: always()  # Roda mesmo se o script falhar, pra manter o cache
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git add grades_cache.json
-          git commit -m "Update grades_cache.json" || echo "No changes to commit"
-          git push
