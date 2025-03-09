@@ -14,14 +14,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Cache pras dependências Python
+      # Cache pras dependências Python (pip)
       - name: Cache Python dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          path: ~/.cache/pip  # Onde o pip armazena os pacotes baixados
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}  # Chave única baseada no SO e requirements.txt (se existir)
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-pip-  # Reusa cache anterior se a chave exata não existir
 
       # Configura o Python
       - name: Set up Python
@@ -29,22 +29,22 @@ jobs:
         with:
           python-version: "3.10"
 
-      # Instala dependências (usa cache se disponível)
+      # Instala dependências (usa o cache do pip se disponível)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install playwright beautifulsoup4 lxml requests python-dotenv
 
-      # Cache pros binários do Playwright
+      # Cache pros binários do Playwright (Chromium)
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
-          path: ~/.cache/playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/sigaa-scraper.py') }}
+          path: ~/.cache/playwright  # Onde o Playwright armazena os binários do Chromium
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/sigaa-scraper.py') }}  # Chave baseada no SO e no script
           restore-keys: |
-            ${{ runner.os }}-playwright-
+            ${{ runner.os }}-playwright-  # Reusa cache anterior se a chave exata não existir
 
-      # Instala os binários do Playwright (se não estiver em cache)
+      # Instala os binários do Playwright (pula se já tiver no cache)
       - name: Install Playwright browsers
         run: |
           playwright install chromium
@@ -53,10 +53,10 @@ jobs:
       - name: Cache grades_cache.json
         uses: actions/cache@v4
         with:
-          path: grades_cache.json
-          key: ${{ runner.os }}-grades-cache-${{ github.sha }}  # Usa o SHA do commit pra persistência
+          path: grades_cache.json  # Arquivo de cache das notas
+          key: ${{ runner.os }}-grades-cache-${{ github.sha }}  # Chave baseada no SHA do commit pra persistência
           restore-keys: |
-            ${{ runner.os }}-grades-cache-
+            ${{ runner.os }}-grades-cache-  # Reusa o cache mais recente se o SHA mudar
 
       # Configura variáveis de ambiente a partir dos secrets
       - name: Set environment variables
