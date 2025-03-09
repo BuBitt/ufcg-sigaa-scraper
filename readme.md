@@ -102,16 +102,3 @@ Sinta-se à vontade pra abrir issues ou pull requests com melhorias!
 
 ## Licença
 Esse projeto é de código aberto e não tem licença formal definida ainda. Use como quiser!
-
----
-
-### **Instruções pra Adicionar**
-1. Crie um arquivo chamado `README.md` na raiz do teu repositório.
-2. Copie e cole o conteúdo acima.
-3. Ajuste o link do `git clone` pra refletir o teu repositório real (`https://github.com/seu-usuario/seu-repositorio.git`).
-4. Faça commit e push:
-   ```bash
-   git add README.md
-   git commit -m "Adiciona README ao projeto"
-   git push
-   ```
