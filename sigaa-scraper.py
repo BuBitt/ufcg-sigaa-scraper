@@ -1,14 +1,12 @@
 from playwright.sync_api import Playwright, sync_playwright
 import logging
 import os
-import csv
 import json
-from datetime import datetime
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, FeatureNotFound  # Importei FeatureNotFound
 from telegram_notifier import notify_changes
-import config  # Importa o arquivo de configuração
+import config
 
-# Configuração do logging
+# Configuração mínima do logging
 logging.basicConfig(
     level=config.LOG_DEPTH,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -19,112 +17,77 @@ logging.basicConfig(
 )
 
 
-def load_env_file(file_path=".env"):
+# Carrega variáveis de ambiente
+def load_env():
     try:
-        with open(file_path, "r") as f:
+        with open(".env", "r") as f:
             for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    key, value = line.split("=", 1)
-                    os.environ[key] = value.strip()
-        logging.info(f"Arquivo .env carregado com sucesso: {file_path}")
+                if line.strip() and not line.startswith("#"):
+                    key, value = line.strip().split("=", 1)
+                    os.environ[key] = value
+        logging.info(".env carregado com sucesso")
     except FileNotFoundError:
-        logging.error(f"Arquivo .env não encontrado: {file_path}")
+        logging.error(".env não encontrado")
         raise
     except Exception as e:
-        logging.error(f"Erro ao carregar o arquivo .env: {str(e)}")
+        logging.error(f"Erro ao carregar .env: {e}")
         raise
 
 
-load_env_file()
+load_env()
 username = os.getenv("SIGAA_USERNAME")
 password = os.getenv("SIGAA_PASSWORD")
-
 if not username or not password:
-    logging.error(
-        "As variáveis SIGAA_USERNAME e SIGAA_PASSWORD devem ser definidas no arquivo .env"
-    )
-    raise ValueError(
-        "As variáveis SIGAA_USERNAME e SIGAA_PASSWORD devem ser definidas no arquivo .env"
-    )
+    logging.error("SIGAA_USERNAME e SIGAA_PASSWORD devem estar no .env")
+    raise ValueError("SIGAA_USERNAME e SIGAA_PASSWORD devem estar no .env")
 
 
-# Função principal para extrair notas usando BeautifulSoup
-def extract_all_grades(html_content):
+# Extrai notas do HTML com eficiência
+def extract_grades(html_content):
+    # Tenta usar lxml, com fallback pra html.parser
+    try:
+        soup = BeautifulSoup(html_content, "lxml")
+    except FeatureNotFound:
+        logging.warning("lxml não encontrado, usando html.parser (mais lento)")
+        soup = BeautifulSoup(html_content, "html.parser")
+
     grades = []
-    soup = BeautifulSoup(html_content, "html.parser")
-    tables = soup.find_all("table", class_="tabelaRelatorio")
-
-    logging.info(f"Encontradas {len(tables)} tabelas com class='tabelaRelatorio'")
-    for table in tables:
-        caption = table.find("caption")
-        current_semester = caption.text.strip() if caption else "Semestre Desconhecido"
-        logging.info(f"Processando tabela do semestre {current_semester}")
-        rows = table.find("tbody").find_all("tr", class_=lambda x: x and "linha" in x)
-        logging.info(f"Encontradas {len(rows)} linhas na tabela de {current_semester}")
-
-        for row in rows:
-            cols = row.find_all("td")
+    for table in soup.find_all("table", class_="tabelaRelatorio"):
+        semester = (
+            table.caption.text.strip() if table.caption else "Semestre Desconhecido"
+        )
+        for row in table.tbody.find_all("tr", class_=lambda x: x and "linha" in x):
+            cols = [col.text.strip() for col in row.find_all("td")]
             if len(cols) >= 2:
-                current_row = [col.text.strip() for col in cols]
-                while len(current_row) < 15:
-                    current_row.append("")
-                grade_entry = {
-                    "Semestre": current_semester,
-                    "Código": current_row[0],
-                    "Disciplina": current_row[1],
-                    "Unidade 1": current_row[2] if current_row[2] != "--" else "",
-                    "Unidade 2": current_row[3] if current_row[3] != "--" else "",
-                    "Unidade 3": current_row[4] if current_row[4] != "--" else "",
-                    "Unidade 4": current_row[5] if current_row[5] != "--" else "",
-                    "Unidade 5": current_row[6] if current_row[6] != "--" else "",
-                    "Unidade 6": current_row[7] if current_row[7] != "--" else "",
-                    "Unidade 7": current_row[8] if current_row[8] != "--" else "",
-                    "Unidade 8": current_row[9] if current_row[9] != "--" else "",
-                    "Unidade 9": current_row[10] if current_row[10] != "--" else "",
-                    "Recuperação": current_row[11] if current_row[11] != "--" else "",
-                    "Resultado": current_row[12] if current_row[12] != "--" else "",
-                    "Faltas": current_row[13],
-                    "Situação": current_row[14],
-                }
-                grades.append(grade_entry)
-                logging.info(
-                    f"Linha capturada: {current_row[1]} (Semestre: {current_semester}) - Colunas: {len(current_row)}"
+                cols += [""] * (15 - len(cols))
+                grades.append(
+                    {
+                        "Semestre": semester,
+                        "Código": cols[0],
+                        "Disciplina": cols[1],
+                        "Unidade 1": "" if cols[2] == "--" else cols[2],
+                        "Unidade 2": "" if cols[3] == "--" else cols[3],
+                        "Unidade 3": "" if cols[4] == "--" else cols[4],
+                        "Unidade 4": "" if cols[5] == "--" else cols[5],
+                        "Unidade 5": "" if cols[6] == "--" else cols[6],
+                        "Unidade 6": "" if cols[7] == "--" else cols[7],
+                        "Unidade 7": "" if cols[8] == "--" else cols[8],
+                        "Unidade 8": "" if cols[9] == "--" else cols[9],
+                        "Unidade 9": "" if cols[10] == "--" else cols[10],
+                        "Recuperação": "" if cols[11] == "--" else cols[11],
+                        "Resultado": "" if cols[12] == "--" else cols[12],
+                        "Faltas": cols[13],
+                        "Situação": cols[14],
+                    }
                 )
-
     if not grades:
-        logging.warning("Nenhuma nota encontrada em nenhuma tabela")
+        logging.warning("Nenhuma nota encontrada")
     else:
-        logging.info(f"{len(grades)} notas extraídas de todas as tabelas")
+        logging.info(f"{len(grades)} notas extraídas")
     return grades
 
 
-def save_to_csv(grades, filename=config.CSV_FILENAME):
-    headers = [
-        "Semestre",
-        "Código",
-        "Disciplina",
-        "Unidade 1",
-        "Unidade 2",
-        "Unidade 3",
-        "Unidade 4",
-        "Unidade 5",
-        "Unidade 6",
-        "Unidade 7",
-        "Unidade 8",
-        "Unidade 9",
-        "Recuperação",
-        "Resultado",
-        "Faltas",
-        "Situação",
-    ]
-    with open(filename, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=headers)
-        writer.writeheader()
-        writer.writerows(grades)
-    logging.info(f"Notas salvas em {filename}")
-
-
+# Carrega cache
 def load_cache(filename=config.CACHE_FILENAME):
     try:
         with open(filename, "r", encoding="utf-8") as f:
@@ -132,215 +95,110 @@ def load_cache(filename=config.CACHE_FILENAME):
     except FileNotFoundError:
         return {}
     except Exception as e:
-        logging.error(f"Erro ao carregar cache: {str(e)}")
+        logging.error(f"Erro ao carregar cache: {e}")
         return {}
 
 
+# Salva cache
 def save_cache(grades, filename=config.CACHE_FILENAME):
     cache = {}
     for grade in grades:
-        semester = grade["Semestre"]
-        if semester not in cache:
-            cache[semester] = []
-        cache[semester].append(grade)
+        cache.setdefault(grade["Semestre"], []).append(grade)
     with open(filename, "w", encoding="utf-8") as f:
-        json.dump(cache, f, ensure_ascii=False, indent=2)
+        json.dump(cache, f, ensure_ascii=False)
     logging.info(f"Cache salvo em {filename}")
 
 
+# Compara notas
 def compare_grades(old_grades, new_grades):
     changes = []
-    old_dict = {
-        f"{g['Semestre']}-{g['Código']}": g
-        for semester, grades in old_grades.items()
-        for g in grades
-    }
-    new_dict = {
-        f"{g['Semestre']}-{g['Código']}": g
-        for semester, grades in new_grades.items()
-        for g in grades
-    }
-
-    # Campos de notas a comparar
-    grade_fields = [
-        "Unidade 1",
-        "Unidade 2",
-        "Unidade 3",
-        "Unidade 4",
-        "Unidade 5",
-        "Unidade 6",
-        "Unidade 7",
-        "Unidade 8",
-        "Unidade 9",
+    grade_fields = ["Unidade " + str(i) for i in range(1, 10)] + [
         "Recuperação",
         "Resultado",
     ]
+    old_dict = {
+        f"{g['Semestre']}-{g['Código']}": g for s, gs in old_grades.items() for g in gs
+    }
+    new_dict = {
+        f"{g['Semestre']}-{g['Código']}": g for s, gs in new_grades.items() for g in gs
+    }
 
-    # Processa disciplinas novas ou alteradas
     for key, new_grade in new_dict.items():
-        if key not in old_dict:
-            # Disciplina nova: só inclui se tiver notas preenchidas
-            for field in grade_fields:
-                new_value = new_grade.get(field, "")
-                if new_value:  # Se a nota não for vazia
-                    changes.append(
-                        f"Alteração em {new_grade['Disciplina']} ({new_grade['Código']}) - Semestre {new_grade['Semestre']}: {field} mudou de '' para '{new_value}'"
-                    )
-        else:
-            # Disciplina existente: compara notas
-            old_grade = old_dict[key]
-            for field in grade_fields:
-                old_value = old_grade.get(field, "")
-                new_value = new_grade.get(field, "")
-                if (
-                    new_value != old_value and new_value
-                ):  # Só inclui se o novo valor não for vazio
-                    changes.append(
-                        f"Alteração em {new_grade['Disciplina']} ({new_grade['Código']}) - Semestre {new_grade['Semestre']}: {field} mudou de '{old_value}' para '{new_value}'"
-                    )
+        old_grade = old_dict.get(key, {})
+        for field in grade_fields:
+            old_value = old_grade.get(field, "")
+            new_value = new_grade.get(field, "")
+            if new_value and new_value != old_value:
+                changes.append(
+                    f"Alteração em {new_grade['Disciplina']} ({new_grade['Código']}) - Semestre {new_grade['Semestre']}: {field} mudou de '{old_value}' para '{new_value}'"
+                )
 
-    if not changes:
-        logging.info("Nenhuma mudança em notas detectada na comparação")
-    else:
-        logging.info(f"{len(changes)} mudanças em notas detectadas na comparação")
+    if changes:
+        logging.info(f"{len(changes)} mudanças detectadas")
         for change in changes:
             logging.info(change)
+    else:
+        logging.info("Nenhuma mudança detectada")
     return changes
 
 
-def run(playwright: Playwright) -> None:
+# Função principal
+def run(playwright: Playwright):
     browser = playwright.chromium.launch(headless=config.HEADLESS_BROWSER)
     context = browser.new_context(
         viewport={"width": config.VIEWPORT_WIDTH, "height": config.VIEWPORT_HEIGHT}
     )
     page = context.new_page()
-
     changes_detected = []
 
     try:
-        logging.info("Acessando a página de login do SIGAA")
-        page.goto("https://sigaa.ufcg.edu.br/sigaa")
-        page.wait_for_load_state("domcontentloaded", timeout=config.TIMEOUT_DEFAULT)
+        logging.info("Acessando SIGAA")
+        page.goto("https://sigaa.ufcg.edu.br/sigaa", wait_until="domcontentloaded")
 
-        logging.info("Preenchendo formulário de login")
+        logging.info("Fazendo login")
         page.fill("input[name='user.login']", username)
         page.fill("input[name='user.senha']", password)
-        page.click("input[type='submit']")
-        page.wait_for_load_state("domcontentloaded", timeout=config.TIMEOUT_DEFAULT)
+        page.click("input[type='submit']", timeout=config.TIMEOUT_DEFAULT)
 
-        logging.info("Verificando modal de cookies")
-        try:
-            cookie_button = page.locator("button.btn-primary:has-text('Ciente')")
-            cookie_button.wait_for(state="visible", timeout=5000)
-            if cookie_button.is_visible():
-                cookie_button.click()
-                logging.info("Modal de cookies aceito")
-        except Exception as e:
-            logging.warning(f"Erro ao aceitar modal de cookies: {str(e)}")
+        logging.info("Lidando com modais")
+        page.locator("button.btn-primary:has-text('Ciente')").click(
+            timeout=5000, force=True
+        )
+        page.locator("#yuievtautoid-0").click(timeout=5000, force=True)
 
-        logging.info("Verificando modals de mensagem")
-        try:
-            modal_close_button = page.locator("#yuievtautoid-0")
-            modal_close_button.wait_for(state="visible", timeout=5000)
-            if modal_close_button.is_visible():
-                modal_close_button.click()
-                logging.info("Modal de mensagem fechado")
-        except Exception as e:
-            logging.warning(f"Erro ao fechar modal de mensagem: {str(e)}")
-
-        logging.info("Aguardando o menu principal carregar")
+        logging.info("Navegando para notas")
         page.wait_for_selector(
-            "#menu_form_menu_discente_discente_menu",
-            state="visible",
-            timeout=config.TIMEOUT_DEFAULT,
+            "#menu_form_menu_discente_discente_menu", timeout=config.TIMEOUT_DEFAULT
         )
         page.locator("#menu_form_menu_discente_discente_menu").hover()
-
-        logging.info("Tentando localizar o menu 'Ensino'")
-        ensino_locator = page.locator(
-            'span.ThemeOfficeMainFolderText:has-text("Ensino")'
+        page.locator('span.ThemeOfficeMainFolderText:has-text("Ensino")').click(
+            timeout=config.TIMEOUT_DEFAULT
         )
-        ensino_locator.wait_for(state="visible", timeout=config.TIMEOUT_DEFAULT)
-        ensino_locator.hover()
-        page.wait_for_timeout(500)
-        ensino_locator.click()
-        page.wait_for_load_state("domcontentloaded", timeout=config.TIMEOUT_DEFAULT)
-
-        logging.info("Tentando localizar a opção 'Consultar Minhas Notas'")
-        notas_locator = page.locator(
+        page.locator(
             'td.ThemeOfficeMenuItemText:has-text("Consultar Minhas Notas")'
-        ).first
-        notas_locator.wait_for(state="visible", timeout=15000)
-        notas_locator.click()
+        ).first.click(timeout=15000)
+        page.wait_for_selector("table.tabelaRelatorio", timeout=config.TIMEOUT_DEFAULT)
 
-        logging.info("Aguardando carregamento completo da página de notas")
-        page.wait_for_selector(
-            "table.tabelaRelatorio", state="visible", timeout=config.TIMEOUT_DEFAULT
-        )
-        page.wait_for_load_state("networkidle", timeout=config.TIMEOUT_DEFAULT)
-
-        logging.info("Salvando conteúdo da página de notas")
-        page_content = page.content()
-        with open(config.HTML_OUTPUT, "w", encoding="utf-8") as f:
-            f.write(page_content)
-        with open(config.HTML_DEBUG_OUTPUT, "w", encoding="utf-8") as f:
-            f.write(page_content)
-
-        table_count = page_content.count("tabelaRelatorio")
-        row_count = page_content.count("<tr")
-        logging.info(
-            f"HTML contém {table_count} ocorrências de 'tabelaRelatorio' e {row_count} linhas '<tr>'"
-        )
-
-        if "tabelaRelatorio" not in page_content:
-            logging.error("Tabela de notas não encontrada no HTML salvo")
-            raise Exception("Tabela de notas não encontrada no HTML")
-
-        grades = extract_all_grades(page_content)
+        logging.info("Extraindo notas")
+        grades = extract_grades(page.content())
         if not grades:
-            logging.error("Nenhuma nota extraída do HTML")
-            raise Exception("Nenhuma nota extraída do HTML")
-
-        if config.CREATE_CSV:
-            save_to_csv(grades)
+            raise Exception("Nenhuma nota extraída")
 
         old_cache = load_cache()
-        cache_grades = {}
+        new_grades = {}
         for grade in grades:
-            semester = grade["Semestre"]
-            if semester not in cache_grades:
-                cache_grades[semester] = []
-            cache_grades[semester].append(grade)
-
-        changes_detected = compare_grades(old_cache, cache_grades)
-        if changes_detected:
-            logging.info("Mudanças detectadas nas notas:")
-            for change in changes_detected:
-                logging.info(change)
-        else:
-            logging.info(
-                "Nenhuma mudança detectada nas notas em relação ao cache anterior."
-            )
-
+            new_grades.setdefault(grade["Semestre"], []).append(grade)
+        changes_detected = compare_grades(old_cache, new_grades)
         save_cache(grades)
 
     except Exception as e:
-        logging.error(f"Erro durante a execução do script: {str(e)}")
+        logging.error(f"Erro: {e}")
         raise
 
     finally:
-        logging.info("Fechando o navegador")
-        context.close()
         browser.close()
-
-        print("\nMudanças detectadas nas notas em relação ao cache anterior:")
-        if changes_detected:
-            for change in changes_detected:
-                print(f"- {change}")
-        else:
-            print("- Nenhuma mudança detectada.")
-
-        # Enviar mudanças pro Telegram
+        print("\nMudanças detectadas:")
+        print("\n".join([f"- {c}" for c in changes_detected]) or "- Nenhuma mudança.")
         notify_changes(changes_detected)
 
 
@@ -349,8 +207,5 @@ if __name__ == "__main__":
         try:
             run(playwright)
         except Exception as e:
-            logging.error(f"Script finalizado com erro: {str(e)}")
-            print(f"Erro: {str(e)}")
-            print(
-                f"Verifique os logs em '{config.LOG_FILENAME}' e o arquivo '{config.HTML_DEBUG_OUTPUT}' para mais detalhes."
-            )
+            logging.error(f"Erro final: {e}")
+            print(f"Erro: {e}")

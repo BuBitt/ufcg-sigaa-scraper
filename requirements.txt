@@ -1,0 +1,15 @@
+beautifulsoup4==4.13.3
+bs4==0.0.2
+certifi==2025.1.31
+charset-normalizer==3.4.1
+dotenv==0.9.9
+greenlet==3.1.1
+idna==3.10
+lxml==5.3.1
+playwright==1.50.0
+pyee==12.1.1
+python-dotenv==1.0.1
+requests==2.32.3
+soupsieve==2.6
+typing_extensions==4.12.2
+urllib3==2.3.0
