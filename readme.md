@@ -78,7 +78,6 @@ Instale com:
 pip install -r requirements.txt
 playwright install chromium
 ```
-(Se criar um `requirements.txt`, adicione as versões exatas.)
 
 ## Notificações
 - **Grupo Telegram:** Lista os nomes das disciplinas com novas notas.
