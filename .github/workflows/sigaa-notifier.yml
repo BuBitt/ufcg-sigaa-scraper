@@ -1,6 +1,8 @@
 name: SIGAA Grade Scraper
 
 on:
+  schedule:
+    - cron: "0 12 * * *"  # Roda todo dia às 12:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -12,14 +14,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Cache pras dependências Python (pip)
+      # Cache pras dependências Python
       - name: Cache Python dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip  # Onde o pip armazena os pacotes baixados
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}  # Chave única baseada no SO e requirements.txt (se existir)
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-  # Reusa cache anterior se a chave exata não existir
+            ${{ runner.os }}-pip-
 
       # Configura o Python
       - name: Set up Python
@@ -27,23 +29,25 @@ jobs:
         with:
           python-version: "3.10"
 
-      # Instala dependências (usa o cache do pip se disponível)
+      # Instala dependências (usa cache se disponível)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install playwright beautifulsoup4 lxml requests python-dotenv
 
-      # Cache pros binários do Playwright (Chromium)
+      # Cache pros binários do Playwright
       - name: Cache Playwright browsers
+        id: cache-playwright  # Adiciona um ID pro passo
         uses: actions/cache@v4
         with:
-          path: ~/.cache/playwright  # Onde o Playwright armazena os binários do Chromium
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/sigaa-scraper.py') }}  # Chave baseada no SO e no script
+          path: ~/.cache/ms-playwright  # Caminho correto pro Chromium no Linux
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/sigaa-scraper.py') }}
           restore-keys: |
-            ${{ runner.os }}-playwright-  # Reusa cache anterior se a chave exata não existir
+            ${{ runner.os }}-playwright-
 
-      # Instala os binários do Playwright (pula se já tiver no cache)
+      # Instala os binários do Playwright só se o cache não foi restaurado
       - name: Install Playwright browsers
+        if: steps.cache-playwright.outputs.cache-hit != 'true'  # Só roda se não houver cache
         run: |
           playwright install chromium
 
@@ -51,10 +55,10 @@ jobs:
       - name: Cache grades_cache.json
         uses: actions/cache@v4
         with:
-          path: grades_cache.json  # Arquivo de cache das notas
-          key: ${{ runner.os }}-grades-cache-${{ github.sha }}  # Chave baseada no SHA do commit pra persistência
+          path: grades_cache.json
+          key: ${{ runner.os }}-grades-cache-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-grades-cache-  # Reusa o cache mais recente se o SHA mudar
+            ${{ runner.os }}-grades-cache-
 
       # Configura variáveis de ambiente a partir dos secrets
       - name: Set environment variables
