@@ -206,3 +206,4 @@ go.work.sum
 .env
 
 notas_completas.csv
+grades_cache.json
