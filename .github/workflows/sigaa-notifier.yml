@@ -1,7 +1,6 @@
 name: SIGAA Grade Scraper
 
 on:
-  schedule:
   workflow_dispatch:      # Permite rodar manualmente
 
 jobs:
