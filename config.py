@@ -3,7 +3,7 @@ import logging
 
 CREATE_CSV = False
 HEADLESS_BROWSER = True
-LOG_DEPTH = logging.INFO
+LOG_DEPTH = logging.DEBUG
 
 CSV_FILENAME = "notas_completas.csv"
 CACHE_FILENAME = "grades_cache.json"
