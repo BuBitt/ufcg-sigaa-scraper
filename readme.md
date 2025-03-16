@@ -51,7 +51,7 @@ O projeto tá configurado pra rodar automaticamente no GitHub Actions.
      - `TELEGRAM_GROUP_CHAT_ID`
      - `TELEGRAM_PRIVATE_CHAT_ID`
 
-3. O workflow roda todo dia às 12:00 UTC (veja `.github/workflows/main.yml`). Pra rodar manualmente, vá na aba **Actions** e clique em "Run workflow".
+3. O workflow roda a cada 15 minutos (veja `.github/workflows/main.yml`). Pra rodar manualmente, vá na aba **Actions** e clique em "Run workflow".
 
 ## Estrutura do Projeto
 ```
