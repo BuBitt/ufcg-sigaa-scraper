@@ -1,10 +1,9 @@
 from playwright.sync_api import Playwright, sync_playwright
 import logging
 import os
-import json
-from bs4 import BeautifulSoup, FeatureNotFound  # Importei FeatureNotFound
-from telegram_notifier import notify_changes
 import config
+import json
+from bs4 import BeautifulSoup
 
 # Configuração mínima do logging
 logging.basicConfig(
@@ -34,122 +33,160 @@ def load_env():
         raise
 
 
-load_env()
-username = os.getenv("SIGAA_USERNAME")
-password = os.getenv("SIGAA_PASSWORD")
-if not username or not password:
-    logging.error("SIGAA_USERNAME e SIGAA_PASSWORD devem estar no .env")
-    raise ValueError("SIGAA_USERNAME e SIGAA_PASSWORD devem estar no .env")
-
-
-# Extrai notas do HTML com eficiência
-def extract_grades(html_content):
-    # Tenta usar lxml, com fallback pra html.parser
+def extract_table_to_json(html_content):
     try:
-        soup = BeautifulSoup(html_content, "lxml")
-    except FeatureNotFound:
-        logging.warning("lxml não encontrado, usando html.parser (mais lento)")
         soup = BeautifulSoup(html_content, "html.parser")
+        table = soup.find("table", class_="tabelaRelatorio")
+        if not table:
+            logging.error("Tabela de notas não encontrada.")
+            return None
 
-    grades = []
-    for table in soup.find_all("table", class_="tabelaRelatorio"):
-        semester = (
-            table.caption.text.strip() if table.caption else "Semestre Desconhecido"
-        )
-        for row in table.tbody.find_all("tr", class_=lambda x: x and "linha" in x):
-            cols = [col.text.strip() for col in row.find_all("td")]
-            if len(cols) >= 2:
-                cols += [""] * (15 - len(cols))
-                grades.append(
-                    {
-                        "Semestre": semester,
-                        "Código": cols[0],
-                        "Disciplina": cols[1],
-                        "Unidade 1": "" if cols[2] == "--" else cols[2],
-                        "Unidade 2": "" if cols[3] == "--" else cols[3],
-                        "Unidade 3": "" if cols[4] == "--" else cols[4],
-                        "Unidade 4": "" if cols[5] == "--" else cols[5],
-                        "Unidade 5": "" if cols[6] == "--" else cols[6],
-                        "Unidade 6": "" if cols[7] == "--" else cols[7],
-                        "Unidade 7": "" if cols[8] == "--" else cols[8],
-                        "Unidade 8": "" if cols[9] == "--" else cols[9],
-                        "Unidade 9": "" if cols[10] == "--" else cols[10],
-                        "Recuperação": "" if cols[11] == "--" else cols[11],
-                        "Resultado": "" if cols[12] == "--" else cols[12],
-                        "Faltas": cols[13],
-                        "Situação": cols[14],
-                    }
-                )
-    if not grades:
-        logging.warning("Nenhuma nota encontrada")
-    else:
-        logging.info(f"{len(grades)} notas extraídas")
-    return grades
+        # Extract headers
+        headers = []
+        main_headers = []
+        for tr in table.find("thead").find_all("tr"):
+            row_headers = []
+            for th in tr.find_all("th"):
+                header_text = th.get_text(strip=True)
+                colspan = int(th.get("colspan", 1))
+                if colspan > 1:
+                    # Expand subdivided headers
+                    row_headers.extend([header_text] * colspan)
+                else:
+                    row_headers.append(header_text)
 
+            if not main_headers:
+                main_headers = row_headers
+            else:
+                # Combine main headers with subdivisions
+                headers = [
+                    f"{main_headers[i]} {row_headers[i]}".strip()
+                    if main_headers[i].startswith("Unid.") and row_headers[i]
+                    else main_headers[i]
+                    for i in range(len(main_headers))
+                ]
 
-# Carrega cache
-def load_cache(filename=config.CACHE_FILENAME):
-    try:
-        with open(filename, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
+        # If no subdivisions, use the main headers
+        if not headers:
+            headers = main_headers
+
+        # Extract rows
+        rows = []
+        for tr in table.find("tbody").find_all("tr"):
+            row_data = {}
+            for idx, td in enumerate(tr.find_all("td")):
+                if idx < len(headers):
+                    row_data[headers[idx]] = td.get_text(strip=True)
+            rows.append(row_data)
+
+        return rows
+
     except Exception as e:
-        logging.error(f"Erro ao carregar cache: {e}")
-        return {}
+        logging.error(f"Erro ao processar a tabela: {e}")
+        return None
 
 
-# Salva cache
-def save_cache(grades, filename=config.CACHE_FILENAME):
-    cache = {}
-    for grade in grades:
-        cache.setdefault(grade["Semestre"], []).append(grade)
-    with open(filename, "w", encoding="utf-8") as f:
-        json.dump(cache, f, ensure_ascii=False)
-    logging.info(f"Cache salvo em {filename}")
+def extract_and_save_grades(page, all_grades):
+    try:
+        logging.info("Extraindo tabela de notas")
+        page.wait_for_selector(
+            "table.tabelaRelatorio, :has-text('Ainda não foram lançadas notas.')",
+            timeout=config.TIMEOUT_DEFAULT,
+        )
+
+        # Check if the message "Ainda não foram lançadas notas." is present
+        if page.locator(":has-text('Ainda não foram lançadas notas.')").count() > 0:
+            component_name = page.locator("h3").text_content().strip()
+            logging.info(f"Nenhuma nota lançada para o componente {component_name}")
+            all_grades[component_name] = "Ainda não foram lançadas notas."
+            return
+
+        # Extract the component name
+        component_name = page.locator("h3").text_content().strip()
+
+        # Get the HTML content of the page
+        html_content = page.content()
+
+        # Extract the table into JSON
+        grades = extract_table_to_json(html_content)
+        if grades is None:
+            logging.error(
+                f"Erro ao processar a tabela para o componente {component_name}"
+            )
+            return
+
+        # Add grades to the unified JSON object
+        all_grades[component_name] = grades
+        logging.info(f"Notas extraídas para o componente {component_name}")
+
+    except Exception as e:
+        logging.error(f"Erro ao extrair notas: {e}")
+        raise
 
 
-# Compara notas
-def compare_grades(old_grades, new_grades):
-    changes = []
-    grade_fields = ["Unidade " + str(i) for i in range(1, 10)] + [
-        "Recuperação",
-        "Resultado",
-    ]
-    old_dict = {
-        f"{g['Semestre']}-{g['Código']}": g for s, gs in old_grades.items() for g in gs
-    }
-    new_dict = {
-        f"{g['Semestre']}-{g['Código']}": g for s, gs in new_grades.items() for g in gs
-    }
+def handle_trocar_turma_and_process(page, processed_turmas, all_grades, browser):
+    try:
+        logging.info("Voltando para a página da turma")
+        page.go_back()
 
-    for key, new_grade in new_dict.items():
-        old_grade = old_dict.get(key, {})
-        for field in grade_fields:
-            old_value = old_grade.get(field, "")
-            new_value = new_grade.get(field, "")
-            if new_value and new_value != old_value:
-                changes.append(
-                    f"Alteração em {new_grade['Disciplina']} ({new_grade['Código']}) - Semestre {new_grade['Semestre']}: {field} mudou de '{old_value}' para '{new_value}'"
+        logging.info("Clicando no botão 'Trocar de Turma'")
+        page.wait_for_selector(
+            "button#formAcoesTurma\\:botaoTrocarTurma",
+            timeout=config.TIMEOUT_DEFAULT,
+        )
+        page.locator("button#formAcoesTurma\\:botaoTrocarTurma").click()
+
+        logging.info("Selecionando a próxima turma não processada")
+        turmas = page.locator("div#j_id_jsp_1879301362_4 a.linkTurma")
+        for i in range(1, turmas.count()):
+            turma = turmas.nth(i)
+            turma_name = turma.locator("span").text_content().strip()
+            if turma_name not in processed_turmas:
+                processed_turmas.add(turma_name)
+                turma.click()
+                logging.info(f"Acessando turma: {turma_name}")
+
+                logging.info("Clicando em 'Ver Notas'")
+                page.wait_for_selector(
+                    "div.itemMenuHeaderAlunos + div a:has-text('Ver Notas')",
+                    timeout=config.TIMEOUT_DEFAULT,
                 )
+                page.locator(
+                    "div.itemMenuHeaderAlunos + div a:has-text('Ver Notas')"
+                ).click()
 
-    if changes:
-        logging.info(f"{len(changes)} mudanças detectadas")
-        for change in changes:
-            logging.info(change)
-    else:
-        logging.info("Nenhuma mudança detectada")
-    return changes
+                logging.info("Extraindo e salvando notas")
+                extract_and_save_grades(page, all_grades)
+
+                logging.info("Voltando para a lista de turmas")
+                page.go_back()
+                page.wait_for_selector(
+                    "button#formAcoesTurma\\:botaoTrocarTurma",
+                    timeout=config.TIMEOUT_DEFAULT,
+                )
+                page.locator("button#formAcoesTurma\\:botaoTrocarTurma").click()
+
+        logging.info("Todas as turmas já foram processadas.")
+        browser.close()
+        logging.info("Navegador fechado após processar todas as turmas.")
+        exit(0)
+
+    except Exception as e:
+        logging.error(f"Erro ao trocar de turma e processar: {e}")
+        raise
 
 
-# Função principal
 def run(playwright: Playwright):
     browser = playwright.chromium.launch(headless=config.HEADLESS_BROWSER)
     context = browser.new_context(
-        viewport={"width": config.VIEWPORT_WIDTH, "height": config.VIEWPORT_HEIGHT}
+        viewport={
+            "width": config.VIEWPORT_WIDTH,
+            "height": config.VIEWPORT_HEIGHT,
+        }
     )
     page = context.new_page()
-    changes_detected = []
+
+    all_grades = {}
 
     try:
         logging.info("Acessando SIGAA")
@@ -159,50 +196,74 @@ def run(playwright: Playwright):
         page.fill("input[name='user.login']", username)
         page.fill("input[name='user.senha']", password)
         page.click("input[type='submit']", timeout=config.TIMEOUT_DEFAULT)
+        page.wait_for_load_state("domcontentloaded")
+        if "login" in page.url:
+            logging.error("Falha no login. Verifique suas credenciais.")
+            raise ValueError("Falha no login.")
+        logging.info("Login realizado com sucesso.")
 
-        logging.info("Lidando com modais")
-        page.locator("button.btn-primary:has-text('Ciente')").click(
-            timeout=5000, force=True
-        )
-        page.locator("#yuievtautoid-0").click(timeout=5000, force=True)
-
-        logging.info("Navegando para notas")
+        logging.info("Identificando todos os links de Componentes Curriculares")
         page.wait_for_selector(
-            "#menu_form_menu_discente_discente_menu", timeout=config.TIMEOUT_DEFAULT
+            "tbody tr td.descricao a", timeout=config.TIMEOUT_DEFAULT
         )
-        page.locator("#menu_form_menu_discente_discente_menu").hover()
-        page.locator('span.ThemeOfficeMainFolderText:has-text("Ensino")').click(
-            timeout=config.TIMEOUT_DEFAULT
-        )
-        page.locator(
-            'td.ThemeOfficeMenuItemText:has-text("Consultar Minhas Notas")'
-        ).first.click(timeout=15000)
-        page.wait_for_selector("table.tabelaRelatorio", timeout=config.TIMEOUT_DEFAULT)
+        component_links = page.locator("tbody tr td.descricao a").all()
 
-        logging.info("Extraindo notas")
-        grades = extract_grades(page.content())
-        if not grades:
-            raise Exception("Nenhuma nota extraída")
+        logging.info(f"Encontrados {len(component_links)} componentes curriculares")
 
-        old_cache = load_cache()
-        new_grades = {}
-        for grade in grades:
-            new_grades.setdefault(grade["Semestre"], []).append(grade)
-        changes_detected = compare_grades(old_cache, new_grades)
-        save_cache(grades)
+        processed_turmas = set()
+
+        for i in range(len(component_links)):
+            logging.info(f"Acessando componente curricular {i + 1}")
+            page.locator("tbody tr td.descricao a").nth(i).click()
+
+            logging.info("Expandindo o menu 'Alunos'")
+            alunos_menu = page.locator("div.itemMenuHeaderAlunos").first
+            alunos_menu.click()
+
+            logging.info("Clicando em 'Ver Notas'")
+            page.wait_for_selector(
+                "div.itemMenuHeaderAlunos + div a:has-text('Ver Notas')",
+                timeout=config.TIMEOUT_DEFAULT,
+            )
+            page.locator(
+                "div.itemMenuHeaderAlunos + div a:has-text('Ver Notas')"
+            ).click()
+
+            logging.info("Extraindo e salvando notas")
+            extract_and_save_grades(page, all_grades)
+
+            while True:
+                try:
+                    logging.info("Trocando para a próxima turma")
+                    handle_trocar_turma_and_process(
+                        page, processed_turmas, all_grades, browser
+                    )
+                except Exception:
+                    logging.info("Não há mais turmas para trocar.")
+                    break
 
     except Exception as e:
         logging.error(f"Erro: {e}")
         raise
-
     finally:
-        browser.close()
-        print("\nMudanças detectadas:")
-        print("\n".join([f"- {c}" for c in changes_detected]) or "- Nenhuma mudança.")
-        notify_changes(changes_detected)
+        with open("grades_cache.json", "w", encoding="utf-8") as f:
+            json.dump(all_grades, f, ensure_ascii=False, indent=4)
+        logging.info("Todas as notas foram salvas em grades_cache.json")
+
+        try:
+            browser.close()
+        except Exception as e:
+            logging.error(f"Erro ao fechar o navegador: {e}")
 
 
 if __name__ == "__main__":
+    load_env()
+    username = os.getenv("SIGAA_USERNAME")
+    password = os.getenv("SIGAA_PASSWORD")
+    if not username or not password:
+        logging.error("SIGAA_USERNAME e SIGAA_PASSWORD devem estar no .env")
+        raise ValueError("SIGAA_USERNAME e SIGAA_PASSWORD devem estar no .env")
+
     with sync_playwright() as playwright:
         try:
             run(playwright)

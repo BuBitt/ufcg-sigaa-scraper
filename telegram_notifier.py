@@ -44,7 +44,7 @@ def generate_group_message(changes):
         {c.split(" - ")[0].replace("Alteração em ", "").split(" (")[0] for c in changes}
     )
     return "*Novas notas foram adicionadas ao SIGAA:*\n\n" + "\n".join(
-        f"{i+1}. {d}" for i, d in enumerate(disciplines)
+        f"{i + 1}. {d}" for i, d in enumerate(disciplines)
     )
 
 
@@ -59,7 +59,7 @@ def generate_private_message(changes):
         note = parts[1].split(" mudou de ")[1].split(" para ")[1].strip("'")
         updates.setdefault(discipline, []).append(f"*{note}*")
     return "*Novas notas foram adicionadas ao SIGAA:*\n\n" + "\n".join(
-        f"{i+1}. {d}: {', '.join(ns)}" for i, (d, ns) in enumerate(updates.items())
+        f"{i + 1}. {d}: {', '.join(ns)}" for i, (d, ns) in enumerate(updates.items())
     )
 
 
