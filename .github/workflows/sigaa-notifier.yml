@@ -2,7 +2,7 @@ name: SIGAA Grade Scraper
 
 on:
   schedule:
-    - cron: "*/10 * * * *"  # Roda a cada 10 minutos
+    - cron: "*/10 6-23 * * *"  # Roda a cada 10 minutos entre 6:00 e 23:59
   workflow_dispatch:
 
 jobs:
