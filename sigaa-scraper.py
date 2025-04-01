@@ -19,6 +19,12 @@ logging.basicConfig(
 
 # Carrega variáveis de ambiente
 def load_env():
+    """
+    Load environment variables from the .env file into the OS environment.
+    Raises:
+        FileNotFoundError: If the .env file is not found.
+        Exception: If there is an error while loading the .env file.
+    """
     try:
         with open(".env", "r") as f:
             for line in f:
@@ -35,6 +41,15 @@ def load_env():
 
 
 def extract_table_to_json(html_content):
+    """
+    Extracts a table of grades from the provided HTML content and converts it into a JSON structure.
+
+    Args:
+        html_content (str): The HTML content containing the grades table.
+
+    Returns:
+        list: A list of dictionaries representing the rows of the table, or None if the table is not found.
+    """
     try:
         soup = BeautifulSoup(html_content, "html.parser")
         table = soup.find("table", class_="tabelaRelatorio")
@@ -96,6 +111,13 @@ def extract_table_to_json(html_content):
 
 
 def extract_and_save_grades(page, all_grades):
+    """
+    Extracts grades from the current page and saves them into the provided dictionary.
+
+    Args:
+        page (playwright.sync_api.Page): The Playwright page object.
+        all_grades (dict): A dictionary to store the extracted grades.
+    """
     try:
         logging.info("Extraindo tabela de notas")
         page.wait_for_selector(
@@ -134,6 +156,15 @@ def extract_and_save_grades(page, all_grades):
 
 
 def handle_trocar_turma_and_process(page, processed_turmas, all_grades, browser):
+    """
+    Handles switching between classes (turmas) and processes their grades.
+
+    Args:
+        page (playwright.sync_api.Page): The Playwright page object.
+        processed_turmas (set): A set of already processed classes.
+        all_grades (dict): A dictionary to store the extracted grades.
+        browser (playwright.sync_api.Browser): The Playwright browser object.
+    """
     try:
         logging.info("Voltando para a página da turma")
         page.go_back()
@@ -159,7 +190,7 @@ def handle_trocar_turma_and_process(page, processed_turmas, all_grades, browser)
                 page.wait_for_selector(
                     "div.itemMenuHeaderAlunos + div a:has-text('Ver Notas')",
                     timeout=config.TIMEOUT_DEFAULT,
-                )
+                )  # noqa: E721
                 page.locator(
                     "div.itemMenuHeaderAlunos + div a:has-text('Ver Notas')"
                 ).click()
@@ -186,27 +217,42 @@ def handle_trocar_turma_and_process(page, processed_turmas, all_grades, browser)
 
 
 def compare_grades(new_grades, saved_grades):
+    """
+    Compares the new grades with the saved grades and identifies differences.
+
+    Args:
+        new_grades (dict): The newly extracted grades.
+        saved_grades (dict): The previously saved grades.
+
+    Returns:
+        None: Sends notifications if differences are found.
+    """
     try:
         differences = {}
         for component, new_data in new_grades.items():
-            # Ensure saved_grades[component] is a list or valid structure
-            if component not in saved_grades or not isinstance(
-                saved_grades[component], list
+            # Handle new components or mismatched types
+            if component not in saved_grades or type(saved_grades[component]) != type(  # noqa: E721
+                new_data
             ):
                 differences[component] = {"status": "Novo componente", "data": new_data}
                 continue
 
             saved_data = saved_grades[component]
             if isinstance(new_data, list) and isinstance(saved_data, list):
-                for new_row, saved_row in zip(new_data, saved_data):
-                    diff = {
-                        key: {
-                            "old": saved_row.get(key, ""),
-                            "new": new_row.get(key, ""),
-                        }
-                        for key in new_row
-                        if new_row.get(key, "") != saved_row.get(key, "")
-                    }
+                for new_row in new_data:
+                    diff = {}
+                    for key, new_value in new_row.items():
+                        # Find the corresponding saved row with the same key, if it exists
+                        old_value = next(
+                            (
+                                saved_row.get(key, "")
+                                for saved_row in saved_data
+                                if key in saved_row
+                            ),
+                            "",
+                        )
+                        if new_value != old_value:
+                            diff[key] = {"old": old_value, "new": new_value}
                     if diff:
                         if component not in differences:
                             differences[component] = []
@@ -235,7 +281,11 @@ def compare_grades(new_grades, saved_grades):
 
 def save_cookies(context, filepath="cookies.json"):
     """
-    Salva os cookies da sessão atual em um arquivo.
+    Saves the current browser session cookies to a file.
+
+    Args:
+        context (playwright.sync_api.BrowserContext): The Playwright browser context.
+        filepath (str): The file path to save the cookies. Defaults to "cookies.json".
     """
     try:
         cookies = context.cookies()
@@ -248,7 +298,11 @@ def save_cookies(context, filepath="cookies.json"):
 
 def load_cookies(context, filepath="cookies.json"):
     """
-    Carrega cookies de um arquivo e os adiciona ao contexto do navegador.
+    Loads cookies from a file and adds them to the browser context.
+
+    Args:
+        context (playwright.sync_api.BrowserContext): The Playwright browser context.
+        filepath (str): The file path to load the cookies from. Defaults to "cookies.json".
     """
     try:
         if os.path.exists(filepath):
@@ -272,7 +326,13 @@ def load_cookies(context, filepath="cookies.json"):
 
 def are_cookies_valid(page):
     """
-    Verifica se os cookies carregados ainda são válidos.
+    Checks if the loaded cookies are still valid by attempting to access the SIGAA homepage.
+
+    Args:
+        page (playwright.sync_api.Page): The Playwright page object.
+
+    Returns:
+        bool: True if the cookies are valid, False otherwise.
     """
     try:
         logging.info("Verificando validade dos cookies.")
@@ -288,6 +348,12 @@ def are_cookies_valid(page):
 
 
 def run(playwright: Playwright):
+    """
+    Main function to execute the SIGAA scraper. Logs in, extracts grades, and saves them.
+
+    Args:
+        playwright (playwright.sync_api.Playwright): The Playwright object.
+    """
     browser = playwright.chromium.launch(headless=config.HEADLESS_BROWSER)
     context = browser.new_context(
         viewport={
@@ -296,31 +362,24 @@ def run(playwright: Playwright):
         }
     )
 
-    # Tentar carregar cookies
-    load_cookies(context)
-
     page = context.new_page()
 
     all_grades = {}
 
     try:
-        # Verificar se os cookies são válidos
-        if not are_cookies_valid(page):
-            logging.info(
-                "Realizando login devido à sessão inválida ou ausência de cookies."
-            )
-            page.goto("https://sigaa.ufcg.edu.br/sigaa", wait_until="domcontentloaded")
-            page.fill("input[name='user.login']", username)
-            page.fill("input[name='user.senha']", password)
-            page.click("input[type='submit']", timeout=config.TIMEOUT_DEFAULT)
-            page.wait_for_load_state("domcontentloaded")
-            if "login" in page.url:
-                logging.error("Falha no login. Verifique suas credenciais.")
-                raise ValueError("Falha no login.")
-            logging.info("Login realizado com sucesso.")
+        logging.info("Acessando SIGAA")
+        page.goto("https://sigaa.ufcg.edu.br/sigaa", wait_until="domcontentloaded")
 
-            # Salvar cookies após login
-            save_cookies(context)
+        # Realizar login sempre
+        logging.info("Realizando login.")
+        page.fill("input[name='user.login']", username)
+        page.fill("input[name='user.senha']", password)
+        page.click("input[type='submit']", timeout=config.TIMEOUT_DEFAULT)
+        page.wait_for_load_state("domcontentloaded")
+        if "login" in page.url:
+            logging.error("Falha no login. Verifique suas credenciais.")
+            raise ValueError("Falha no login.")
+        logging.info("Login realizado com sucesso.")
 
         logging.info("Sessão válida. Continuando execução.")
         logging.info("Identificando todos os links de Componentes Curriculares")
