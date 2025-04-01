@@ -11,7 +11,7 @@ HTML_OUTPUT = "minhas_notas.html"
 HTML_DEBUG_OUTPUT = "minhas_notas_debug.html"
 LOG_FILENAME = "script.log"
 
-SEND_TELEGRAM_GROUP = True  # Ativar envio pro grupo
+SEND_TELEGRAM_GROUP = False  # Ativar envio pro grupo
 SEND_TELEGRAM_PRIVATE = True  # Ativar envio pro chat privado
 
 TIMEOUT_DEFAULT = 30000

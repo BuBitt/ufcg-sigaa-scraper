@@ -2,6 +2,7 @@ caches
 logs
 venv-notion
 venv
+cookies.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

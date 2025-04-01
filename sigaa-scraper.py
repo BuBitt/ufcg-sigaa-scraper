@@ -73,10 +73,18 @@ def extract_table_to_json(html_content):
 
         # Extract rows
         rows = []
+        excluded_keys = {
+            "Reposição",
+            "Resultado",
+            "Faltas",
+            "Sit.",
+            "Nome",
+            "Matrícula",
+        }
         for tr in table.find("tbody").find_all("tr"):
             row_data = {}
             for idx, td in enumerate(tr.find_all("td")):
-                if idx < len(headers):
+                if idx < len(headers) and headers[idx] not in excluded_keys:
                     row_data[headers[idx]] = td.get_text(strip=True)
             rows.append(row_data)
 
@@ -181,7 +189,10 @@ def compare_grades(new_grades, saved_grades):
     try:
         differences = {}
         for component, new_data in new_grades.items():
-            if component not in saved_grades:
+            # Ensure saved_grades[component] is a list or valid structure
+            if component not in saved_grades or not isinstance(
+                saved_grades[component], list
+            ):
                 differences[component] = {"status": "Novo componente", "data": new_data}
                 continue
 
@@ -222,6 +233,60 @@ def compare_grades(new_grades, saved_grades):
         logging.error(f"Erro ao comparar notas: {e}")
 
 
+def save_cookies(context, filepath="cookies.json"):
+    """
+    Salva os cookies da sessão atual em um arquivo.
+    """
+    try:
+        cookies = context.cookies()
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(cookies, f, ensure_ascii=False, indent=4)
+        logging.info("Cookies salvos com sucesso.")
+    except Exception as e:
+        logging.error(f"Erro ao salvar cookies: {e}")
+
+
+def load_cookies(context, filepath="cookies.json"):
+    """
+    Carrega cookies de um arquivo e os adiciona ao contexto do navegador.
+    """
+    try:
+        if os.path.exists(filepath):
+            with open(filepath, "r", encoding="utf-8") as f:
+                cookies = json.load(f)
+            for cookie in cookies:
+                # Ensure the domain, path, and secure attributes are set correctly
+                if "domain" not in cookie or not cookie["domain"]:
+                    cookie["domain"] = "sigaa.ufcg.edu.br"
+                if "path" not in cookie or not cookie["path"]:
+                    cookie["path"] = "/"
+                if "secure" not in cookie:
+                    cookie["secure"] = True
+            context.add_cookies(cookies)
+            logging.info("Cookies carregados com sucesso.")
+        else:
+            logging.info("Arquivo de cookies não encontrado.")
+    except Exception as e:
+        logging.error(f"Erro ao carregar cookies: {e}")
+
+
+def are_cookies_valid(page):
+    """
+    Verifica se os cookies carregados ainda são válidos.
+    """
+    try:
+        logging.info("Verificando validade dos cookies.")
+        page.goto("https://sigaa.ufcg.edu.br/sigaa", wait_until="domcontentloaded")
+        if "login" in page.url or page.locator("input[name='user.login']").count() > 0:
+            logging.info("Sessão inválida. Cookies não são válidos.")
+            return False
+        logging.info("Sessão válida. Cookies são válidos.")
+        return True
+    except Exception as e:
+        logging.error(f"Erro ao verificar validade dos cookies: {e}")
+        return False
+
+
 def run(playwright: Playwright):
     browser = playwright.chromium.launch(headless=config.HEADLESS_BROWSER)
     context = browser.new_context(
@@ -230,24 +295,34 @@ def run(playwright: Playwright):
             "height": config.VIEWPORT_HEIGHT,
         }
     )
+
+    # Tentar carregar cookies
+    load_cookies(context)
+
     page = context.new_page()
 
     all_grades = {}
 
     try:
-        logging.info("Acessando SIGAA")
-        page.goto("https://sigaa.ufcg.edu.br/sigaa", wait_until="domcontentloaded")
+        # Verificar se os cookies são válidos
+        if not are_cookies_valid(page):
+            logging.info(
+                "Realizando login devido à sessão inválida ou ausência de cookies."
+            )
+            page.goto("https://sigaa.ufcg.edu.br/sigaa", wait_until="domcontentloaded")
+            page.fill("input[name='user.login']", username)
+            page.fill("input[name='user.senha']", password)
+            page.click("input[type='submit']", timeout=config.TIMEOUT_DEFAULT)
+            page.wait_for_load_state("domcontentloaded")
+            if "login" in page.url:
+                logging.error("Falha no login. Verifique suas credenciais.")
+                raise ValueError("Falha no login.")
+            logging.info("Login realizado com sucesso.")
 
-        logging.info("Fazendo login")
-        page.fill("input[name='user.login']", username)
-        page.fill("input[name='user.senha']", password)
-        page.click("input[type='submit']", timeout=config.TIMEOUT_DEFAULT)
-        page.wait_for_load_state("domcontentloaded")
-        if "login" in page.url:
-            logging.error("Falha no login. Verifique suas credenciais.")
-            raise ValueError("Falha no login.")
-        logging.info("Login realizado com sucesso.")
+            # Salvar cookies após login
+            save_cookies(context)
 
+        logging.info("Sessão válida. Continuando execução.")
         logging.info("Identificando todos os links de Componentes Curriculares")
         page.wait_for_selector(
             "tbody tr td.descricao a", timeout=config.TIMEOUT_DEFAULT
@@ -293,9 +368,18 @@ def run(playwright: Playwright):
         raise
     finally:
         try:
+            # Verificar se o arquivo grades_cache.json existe e não está vazio
             if os.path.exists("grades_cache.json"):
-                with open("grades_cache.json", "r", encoding="utf-8") as f:
-                    saved_grades = json.load(f)
+                try:
+                    with open("grades_cache.json", "r", encoding="utf-8") as f:
+                        saved_grades = (
+                            json.load(f) or {}
+                        )  # Garantir que seja um dicionário
+                except json.JSONDecodeError:
+                    logging.warning(
+                        "grades_cache.json está vazio ou corrompido. Inicializando como vazio."
+                    )
+                    saved_grades = {}
                 compare_grades(all_grades, saved_grades)
             else:
                 logging.info(
