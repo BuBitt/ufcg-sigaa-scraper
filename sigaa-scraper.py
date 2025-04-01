@@ -4,6 +4,7 @@ import os
 import config
 import json
 from bs4 import BeautifulSoup
+from telegram_notifier import notify_changes  # Import the notifier
 
 # Configuração mínima do logging
 logging.basicConfig(
@@ -176,6 +177,51 @@ def handle_trocar_turma_and_process(page, processed_turmas, all_grades, browser)
         raise
 
 
+def compare_grades(new_grades, saved_grades):
+    try:
+        differences = {}
+        for component, new_data in new_grades.items():
+            if component not in saved_grades:
+                differences[component] = {"status": "Novo componente", "data": new_data}
+                continue
+
+            saved_data = saved_grades[component]
+            if isinstance(new_data, list) and isinstance(saved_data, list):
+                for new_row, saved_row in zip(new_data, saved_data):
+                    diff = {
+                        key: {
+                            "old": saved_row.get(key, ""),
+                            "new": new_row.get(key, ""),
+                        }
+                        for key in new_row
+                        if new_row.get(key, "") != saved_row.get(key, "")
+                    }
+                    if diff:
+                        if component not in differences:
+                            differences[component] = []
+                        differences[component].append(diff)
+            elif new_data != saved_data:
+                differences[component] = {
+                    "status": "Alterado",
+                    "old": saved_data,
+                    "new": new_data,
+                }
+
+        for component in saved_grades:
+            if component not in new_grades:
+                differences[component] = {"status": "Removido"}
+
+        if differences:
+            logging.info("Diferenças encontradas:")
+            print(json.dumps(differences, ensure_ascii=False, indent=4))
+            notify_changes(differences)  # Notify changes via Telegram
+        else:
+            logging.info("Nenhuma diferença encontrada nas notas.")
+
+    except Exception as e:
+        logging.error(f"Erro ao comparar notas: {e}")
+
+
 def run(playwright: Playwright):
     browser = playwright.chromium.launch(headless=config.HEADLESS_BROWSER)
     context = browser.new_context(
@@ -246,9 +292,22 @@ def run(playwright: Playwright):
         logging.error(f"Erro: {e}")
         raise
     finally:
-        with open("grades_cache.json", "w", encoding="utf-8") as f:
-            json.dump(all_grades, f, ensure_ascii=False, indent=4)
-        logging.info("Todas as notas foram salvas em grades_cache.json")
+        try:
+            if os.path.exists("grades_cache.json"):
+                with open("grades_cache.json", "r", encoding="utf-8") as f:
+                    saved_grades = json.load(f)
+                compare_grades(all_grades, saved_grades)
+            else:
+                logging.info(
+                    "Nenhum arquivo grades_cache.json encontrado. Salvando novo arquivo."
+                )
+
+            with open("grades_cache.json", "w", encoding="utf-8") as f:
+                json.dump(all_grades, f, ensure_ascii=False, indent=4)
+            logging.info("Todas as notas foram salvas em grades_cache.json")
+
+        except Exception as e:
+            logging.error(f"Erro ao salvar ou comparar grades_cache.json: {e}")
 
         try:
             browser.close()

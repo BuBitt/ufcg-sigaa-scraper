@@ -1,6 +1,7 @@
 import os
 import logging
 import requests
+import json  # Import to handle the dictionary file
 from dotenv import load_dotenv
 import config
 
@@ -36,13 +37,48 @@ def get_telegram_credentials():
     return group_chat_id, private_chat_id, bot_token
 
 
+# Carrega o dicionário de substituição de nomes de disciplinas
+def load_discipline_replacements():
+    try:
+        with open("discipline_replacements.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        logging.warning(
+            "Arquivo discipline_replacements.json não encontrado. Usando substituições padrão."
+        )
+        return {}
+    except Exception as e:
+        logging.error(f"Erro ao carregar discipline_replacements.json: {e}")
+        return {}
+
+
+# Substitui o nome da disciplina com base no dicionário
+def replace_discipline_name(discipline_name, replacements):
+    return replacements.get(discipline_name, discipline_name)
+
+
 # Gera mensagem pro grupo
 def generate_group_message(changes):
     if not changes:
         return None
-    disciplines = sorted(
-        {c.split(" - ")[0].replace("Alteração em ", "").split(" (")[0] for c in changes}
-    )
+    replacements = load_discipline_replacements()
+    disciplines = []
+    for component, updates in changes.items():
+        discipline_name = component.split(" - ")[1].split(" (")[
+            0
+        ]  # Extract discipline name
+        discipline_name = replace_discipline_name(discipline_name, replacements)
+        for update in updates:
+            for key in update:
+                if "Unid." in key:
+                    parts = key.split(" ")
+                    if (
+                        len(parts) > 2
+                    ):  # Check if there is something after "Unid. ~Numero~"
+                        subdivision = parts[-1]
+                        discipline_name += f" ({subdivision})"
+        disciplines.append(discipline_name)
+    disciplines = sorted(set(disciplines))  # Remove duplicates and sort
     return "*Novas notas foram adicionadas ao SIGAA:*\n\n" + "\n".join(
         f"{i + 1}. {d}" for i, d in enumerate(disciplines)
     )
@@ -52,12 +88,25 @@ def generate_group_message(changes):
 def generate_private_message(changes):
     if not changes:
         return None
+    replacements = load_discipline_replacements()
     updates = {}
-    for c in changes:
-        parts = c.split(" - ")
-        discipline = parts[0].replace("Alteração em ", "").split(" (")[0]
-        note = parts[1].split(" mudou de ")[1].split(" para ")[1].strip("'")
-        updates.setdefault(discipline, []).append(f"*{note}*")
+    for component, changes_list in changes.items():
+        discipline_name = component.split(" - ")[1].split(" (")[
+            0
+        ]  # Extract discipline name
+        discipline_name = replace_discipline_name(discipline_name, replacements)
+        for change in changes_list:
+            for key, value in change.items():
+                if "Unid." in key:
+                    parts = key.split(" ")
+                    if (
+                        len(parts) > 2
+                    ):  # Check if there is something after "Unid. ~Numero~"
+                        subdivision = parts[-1]
+                        discipline_name += f" ({subdivision})"
+                updates.setdefault(discipline_name, []).append(
+                    value["new"]
+                )  # Add the new value
     return "*Novas notas foram adicionadas ao SIGAA:*\n\n" + "\n".join(
         f"{i + 1}. {d}: {', '.join(ns)}" for i, (d, ns) in enumerate(updates.items())
     )
