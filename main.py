@@ -26,6 +26,7 @@ def main():
         raise ValueError("SIGAA_USERNAME e SIGAA_PASSWORD devem estar no .env")
 
     with sync_playwright() as playwright:
+        browser = None
         try:
             # Initialize browser and extract grades
             browser, context, page = create_browser(playwright)
@@ -44,8 +45,10 @@ def main():
 
         except Exception as e:
             logging.error(f"Erro durante a execução: {e}")
+            raise
         finally:
-            close_browser(browser)
+            if browser:
+                close_browser(browser)
 
 
 if __name__ == "__main__":
@@ -53,4 +56,4 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         logging.error(f"Erro fatal: {e}")
-        print(f"Erro: {e}")
+        raise

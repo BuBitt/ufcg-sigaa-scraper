@@ -25,8 +25,9 @@ def get_telegram_credentials():
         or (config.SEND_TELEGRAM_GROUP and not group_chat_id)
         or (config.SEND_TELEGRAM_PRIVATE and not private_chat_id)
     ):
-        logging.error("Credenciais do Telegram incompletas no .env")
-        raise ValueError("Credenciais do Telegram incompletas no .env")
+        error_msg = "Credenciais do Telegram incompletas no .env"
+        logging.error(error_msg)
+        raise ValueError(error_msg)
     return group_chat_id, private_chat_id, bot_token
 
 
