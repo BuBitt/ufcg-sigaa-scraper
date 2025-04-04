@@ -2,7 +2,7 @@ name: SIGAA Grade Scraper
 
 on:
   schedule:
-    - cron: "*/10 6-23 * * *"  # Roda a cada 10 minutos entre 6:00 e 23:59
+    - cron: "*/10 6-23 * * *"  # Runs every 10 minutes between 6:00 and 23:59
   workflow_dispatch:
 
 jobs:
@@ -10,11 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Faz checkout do repositório
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Cache pras dependências Python
       - name: Cache Python dependencies
         uses: actions/cache@v4
         with:
@@ -23,35 +21,30 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Configura o Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      # Instala dependências (usa cache se disponível)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install playwright beautifulsoup4 lxml requests python-dotenv
 
-      # Cache pros binários do Playwright
       - name: Cache Playwright browsers
-        id: cache-playwright  # Adiciona um ID pro passo
+        id: cache-playwright
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ms-playwright  # Caminho correto pro Chromium no Linux
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/sigaa-scraper.py') }}
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/main.py') }}
           restore-keys: |
             ${{ runner.os }}-playwright-
 
-      # Instala os binários do Playwright só se o cache não foi restaurado
       - name: Install Playwright browsers
-        if: steps.cache-playwright.outputs.cache-hit != 'true'  # Só roda se não houver cache
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: |
           playwright install chromium
 
-      # Cache pro grades_cache.json
       - name: Cache grades_cache.json
         uses: actions/cache@v4
         with:
@@ -60,21 +53,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-grades-cache-
 
-      # Configura variáveis de ambiente a partir dos secrets
       - name: Set environment variables
-        env:
-          SIGAA_USERNAME: ${{ secrets.SIGAA_USERNAME }}
-          SIGAA_PASSWORD: ${{ secrets.SIGAA_PASSWORD }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_GROUP_CHAT_ID: ${{ secrets.TELEGRAM_GROUP_CHAT_ID }}
-          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
         run: |
-          echo "SIGAA_USERNAME=$SIGAA_USERNAME" >> .env
-          echo "SIGAA_PASSWORD=$SIGAA_PASSWORD" >> .env
-          echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN" >> .env
-          echo "TELEGRAM_GROUP_CHAT_ID=$TELEGRAM_GROUP_CHAT_ID" >> .env
-          echo "TELEGRAM_PRIVATE_CHAT_ID=$TELEGRAM_PRIVATE_CHAT_ID" >> .env
+          echo "SIGAA_USERNAME=${{ secrets.SIGAA_USERNAME }}" >> .env
+          echo "SIGAA_PASSWORD=${{ secrets.SIGAA_PASSWORD }}" >> .env
+          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env
+          echo "TELEGRAM_GROUP_CHAT_ID=${{ secrets.TELEGRAM_GROUP_CHAT_ID }}" >> .env
+          echo "TELEGRAM_PRIVATE_CHAT_ID=${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}" >> .env
 
-      # Roda o script principal
       - name: Run SIGAA Scraper
-        run: python sigaa-scraper.py
+        run: python main.py
