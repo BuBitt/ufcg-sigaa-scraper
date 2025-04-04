@@ -45,7 +45,6 @@ def main():
 
         except Exception as e:
             logging.error(f"Erro durante a execução: {e}")
-            raise
         finally:
             if browser:
                 close_browser(browser)
@@ -56,4 +55,3 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         logging.error(f"Erro fatal: {e}")
-        raise

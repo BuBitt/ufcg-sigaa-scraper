@@ -1,69 +1,92 @@
 # SIGAA Grade Scraper
 
-Um scraper para verificar e notificar quando novas notas forem adicionadas ao SIGAA da UFCG. Este projeto usa automação de navegador pra extrair notas do SIGAA e envia notificações via Telegram quando há mudanças, rodando automaticamente no GitHub Actions.
+Um scraper para verificar e notificar automaticamente quando novas notas são adicionadas ao SIGAA da UFCG. Este projeto utiliza automação de navegador para extrair notas e envia notificações via Telegram quando mudanças são detectadas.
 
 ## Funcionalidades
-- Faz login no SIGAA da UFCG.
-- Extrai notas de todos os semestres disponíveis.
-- Compara com um cache pra detectar novas notas ou alterações.
-- Envia notificações pro Telegram (grupo e chat privado) com as mudanças.
+
+- Login automático no SIGAA da UFCG
+- Extração de notas de todos os componentes curriculares e turmas
+- Sistema de cache para detectar novas notas ou alterações
+- Notificações via Telegram (grupo e chat privado) com formato customizado
+- Suporte a múltiplas turmas por componente curricular
+- Tratamento de erros robusto para garantir execução contínua
+- Execução automatizada via GitHub Actions
 
 ## Pré-requisitos
+
 - **Python 3.10+**
-- Conta no SIGAA UFCG (usuário e senha).
-- Bot do Telegram configurado com token e IDs de chat.
+- Conta no SIGAA UFCG (usuário e senha)
+- Bot do Telegram configurado com token e IDs de chat
 
 ## Instalação
-1. Clone o repositório
+
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/seu-usuario/ufcg-sigaa-scraper.git
+   cd ufcg-sigaa-scraper
+   ```
 
 2. Instale as dependências:
    ```bash
-   pip install playwright beautifulsoup4 lxml requests python-dotenv
+   pip install -r requirements.txt
    playwright install chromium
    ```
 
-3. Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
+3. Configure o arquivo `.env` na raiz do projeto:
    ```
    SIGAA_USERNAME=seu_usuario
    SIGAA_PASSWORD=sua_senha
    TELEGRAM_BOT_TOKEN=seu_token
-   TELEGRAM_GROUP_CHAT_ID=-123456789
-   TELEGRAM_PRIVATE_CHAT_ID=987654321
+   TELEGRAM_GROUP_CHAT_ID=-1001234567890
+   TELEGRAM_PRIVATE_CHAT_ID=1234567890
    ```
 
 ## Uso Local
-Rode o script manualmente:
+
+Execute o script principal:
 ```bash
-python sigaa-scraper.py
+python main.py
 ```
-O script vai fazer login no SIGAA, extrair as notas, comparar com o `grades_cache.json` e enviar notificações pro Telegram se houver mudanças.
 
-## Uso no GitHub Actions
-O projeto tá configurado pra rodar automaticamente no GitHub Actions.
+O script realizará login no SIGAA, extrairá as notas, comparará com o cache anterior e enviará notificações caso detecte mudanças.
 
-1. Faça push do repositório pro GitHub.
-2. Configure os **Secrets** no GitHub:
-   - Vá em **Settings > Secrets and variables > Actions > Secrets**.
-   - Adicione:
+## Execução Automática (GitHub Actions)
+
+O projeto está configurado para executar automaticamente no GitHub Actions:
+
+1. Faça push do repositório para o GitHub
+2. Configure os **Secrets** necessários no GitHub:
+   - Acesse **Settings > Secrets and variables > Actions > Secrets**
+   - Adicione os seguintes secrets:
      - `SIGAA_USERNAME`
      - `SIGAA_PASSWORD`
      - `TELEGRAM_BOT_TOKEN`
      - `TELEGRAM_GROUP_CHAT_ID`
      - `TELEGRAM_PRIVATE_CHAT_ID`
 
-3. O workflow roda a cada 15 minutos (veja `.github/workflows/main.yml`). Pra rodar manualmente, vá na aba **Actions** e clique em "Run workflow".
+3. O workflow está configurado para executar a cada 10 minutos durante o horário comercial (6:00-23:59).
+   Para executar manualmente, acesse a aba **Actions** e clique em "Run workflow".
 
 ## Estrutura do Projeto
 ```
 sigaa-grade-scraper/
-├── .env              # Variáveis de ambiente (não versionado)
-├── config.py         # Configurações gerais
-├── sigaa-scraper.py  # Script principal
-├── telegram_notifier.py  # Lógica de notificação pro Telegram
-├── grades_cache.json  # Cache das notas (gerado automaticamente)
+├── .env                      # Variáveis de ambiente (não versionado)
+├── config.py                 # Configurações gerais
+├── main.py                   # Script principal
+├── scraper/                  # Lógica de extração e processamento
+│   ├── browser.py            # Automação do navegador
+│   ├── processor.py          # Processamento de componentes e turmas
+│   └── extractor.py          # Extração de tabelas de notas
+├── notification/             # Sistema de notificações
+│   └── telegram.py           # Notificações via Telegram
+├── utils/                    # Utilitários
+│   ├── logger.py             # Configuração de logs
+│   └── file_handler.py       # Manipulação de arquivos e cache
+├── grades_cache.json         # Cache das notas (gerado automaticamente)
+├── discipline_replacements.json # Substituições de nomes de disciplinas
 └── .github/
     └── workflows/
-        └── main.yml  # Workflow do GitHub Actions
+        └── sigaa-notifier.yml # Workflow do GitHub Actions
 ```
 
 ## Dependências
@@ -81,7 +104,7 @@ playwright install chromium
 
 ## Notificações
 - **Grupo Telegram:** Lista os nomes das disciplinas com novas notas.
-- **Chat Privado:** Mostra as disciplinas e as notas em negrito.
+- **Chat Privado:** Mostra as disciplinas e as notas detalhadas.
 
 Exemplo:
 - Grupo:
