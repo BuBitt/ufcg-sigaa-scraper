@@ -6,11 +6,11 @@ import config
 
 def load_env():
     """
-    Load environment variables from the .env file into the OS environment.
+    Carrega as variáveis de ambiente do arquivo .env para o ambiente do sistema.
 
     Raises:
-        FileNotFoundError: If the .env file is not found
-        Exception: If there is an error loading the .env file
+        FileNotFoundError: Se o arquivo .env não for encontrado.
+        Exception: Se houver um erro ao carregar o arquivo .env.
     """
     try:
         with open(".env", "r") as f:
@@ -29,13 +29,13 @@ def load_env():
 
 def load_grades(filepath=config.CACHE_FILENAME):
     """
-    Load grades from the cache file.
+    Carrega as notas do arquivo de cache.
 
     Args:
-        filepath (str): Path to the cache file
+        filepath (str): Caminho para o arquivo de cache.
 
     Returns:
-        dict: The loaded grades or an empty dictionary if the file doesn't exist
+        dict: As notas carregadas ou um dicionário vazio se o arquivo não existir.
     """
     try:
         if os.path.exists(filepath):
@@ -57,11 +57,11 @@ def load_grades(filepath=config.CACHE_FILENAME):
 
 def save_grades(grades, filepath=config.CACHE_FILENAME):
     """
-    Save grades to the cache file.
+    Salva as notas no arquivo de cache.
 
     Args:
-        grades (dict): The grades to save
-        filepath (str): Path to the cache file
+        grades (dict): As notas a serem salvas.
+        filepath (str): Caminho para o arquivo de cache.
     """
     try:
         with open(filepath, "w", encoding="utf-8") as f:
@@ -73,14 +73,14 @@ def save_grades(grades, filepath=config.CACHE_FILENAME):
 
 def compare_grades(new_grades, saved_grades):
     """
-    Compare new grades with saved grades and identify differences.
+    Compara as novas notas com as notas salvas e identifica diferenças.
 
     Args:
-        new_grades (dict): The newly extracted grades
-        saved_grades (dict): The previously saved grades
+        new_grades (dict): As novas notas extraídas.
+        saved_grades (dict): As notas salvas anteriormente.
 
     Returns:
-        dict: A dictionary of differences between the two sets of grades
+        dict: Um dicionário com as diferenças entre os dois conjuntos de notas.
     """
     try:
         differences = {}
@@ -138,13 +138,13 @@ def compare_grades(new_grades, saved_grades):
 
 def load_discipline_replacements(filepath="discipline_replacements.json"):
     """
-    Load the discipline replacements dictionary.
+    Carrega o dicionário de substituições de nomes de disciplinas.
 
     Args:
-        filepath (str): Path to the replacements file
+        filepath (str): Caminho para o arquivo de substituições.
 
     Returns:
-        dict: The replacements dictionary or an empty dictionary if the file doesn't exist
+        dict: O dicionário de substituições ou um dicionário vazio se o arquivo não existir.
     """
     try:
         with open(filepath, "r", encoding="utf-8") as f:

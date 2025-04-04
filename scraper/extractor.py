@@ -5,13 +5,13 @@ import config
 
 def extract_table_to_json(html_content):
     """
-    Extract a table of grades from HTML content and convert it to JSON.
+    Extrai uma tabela de notas do conteúdo HTML e a converte para JSON.
 
     Args:
-        html_content (str): The HTML content with the grades table
+        html_content (str): O conteúdo HTML com a tabela de notas.
 
     Returns:
-        list: A list of dictionaries with the table data, or None if extraction fails
+        list: Uma lista de dicionários com os dados da tabela, ou None se a extração falhar.
     """
     try:
         soup = BeautifulSoup(html_content, "html.parser")
@@ -75,11 +75,11 @@ def extract_table_to_json(html_content):
 
 def extract_and_save_grades(page, all_grades):
     """
-    Extract grades from the current page and save them to the provided dictionary.
+    Extrai as notas da página atual e as salva no dicionário fornecido.
 
     Args:
-        page: The browser page
-        all_grades (dict): Dictionary to store the extracted grades
+        page: A página do navegador.
+        all_grades (dict): Dicionário para armazenar as notas extraídas.
     """
     try:
         logging.info("Extraindo tabela de notas")

@@ -4,7 +4,7 @@ import config
 
 def setup_logging():
     """
-    Configure the logging system for the application.
+    Configura o sistema de logs para a aplicação.
     """
     logging.basicConfig(
         level=config.LOG_DEPTH,
@@ -19,12 +19,12 @@ def setup_logging():
 
 def log_error_and_raise(message, exception_class=Exception, *args, **kwargs):
     """
-    Log an error message and raise an exception.
+    Registra uma mensagem de erro e lança uma exceção.
 
     Args:
-        message (str): The error message to log
-        exception_class (Exception): The exception class to raise
-        *args, **kwargs: Arguments to pass to the exception constructor
+        message (str): A mensagem de erro a ser registrada.
+        exception_class (Exception): A classe da exceção a ser lançada.
+        *args, **kwargs: Argumentos a serem passados para o construtor da exceção.
     """
     logging.error(message)
     raise exception_class(message, *args, **kwargs)

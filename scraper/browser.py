@@ -6,13 +6,13 @@ import config
 
 def create_browser(playwright):
     """
-    Create and configure a browser instance.
+    Cria e configura uma instância do navegador.
 
     Args:
-        playwright: The Playwright instance
+        playwright: A instância do Playwright.
 
     Returns:
-        tuple: (browser, context, page) - The browser objects
+        tuple: (browser, context, page) - Os objetos do navegador.
     """
     browser = playwright.chromium.launch(headless=config.HEADLESS_BROWSER)
     context = browser.new_context(
@@ -27,10 +27,10 @@ def create_browser(playwright):
 
 def close_browser(browser):
     """
-    Safely close the browser.
+    Fecha o navegador de forma segura.
 
     Args:
-        browser: The browser instance to close
+        browser: A instância do navegador a ser fechada.
     """
     try:
         if browser:
@@ -42,11 +42,11 @@ def close_browser(browser):
 
 def save_cookies(context, filepath="cookies.json"):
     """
-    Save the browser cookies to a file.
+    Salva os cookies do navegador em um arquivo.
 
     Args:
-        context: The browser context
-        filepath (str): Path to save the cookies
+        context: O contexto do navegador.
+        filepath (str): Caminho para salvar os cookies.
     """
     try:
         cookies = context.cookies()
@@ -59,11 +59,11 @@ def save_cookies(context, filepath="cookies.json"):
 
 def load_cookies(context, filepath="cookies.json"):
     """
-    Load cookies from a file into the browser context.
+    Carrega os cookies de um arquivo para o contexto do navegador.
 
     Args:
-        context: The browser context
-        filepath (str): Path to the cookies file
+        context: O contexto do navegador.
+        filepath (str): Caminho para o arquivo de cookies.
     """
     try:
         if os.path.exists(filepath):
@@ -87,13 +87,13 @@ def load_cookies(context, filepath="cookies.json"):
 
 def are_cookies_valid(page):
     """
-    Check if the loaded cookies are still valid.
+    Verifica se os cookies carregados ainda são válidos.
 
     Args:
-        page: The browser page
+        page: A página do navegador.
 
     Returns:
-        bool: True if the cookies are valid, False otherwise
+        bool: True se os cookies forem válidos, False caso contrário.
     """
     try:
         logging.info("Verificando validade dos cookies.")
@@ -110,15 +110,15 @@ def are_cookies_valid(page):
 
 def perform_login(page, username, password):
     """
-    Perform login on the SIGAA platform.
+    Realiza o login na plataforma SIGAA.
 
     Args:
-        page: The browser page
-        username (str): SIGAA username
-        password (str): SIGAA password
+        page: A página do navegador.
+        username (str): Nome de usuário do SIGAA.
+        password (str): Senha do SIGAA.
 
     Returns:
-        bool: True if login was successful, False otherwise
+        bool: True se o login foi bem-sucedido, False caso contrário.
     """
     try:
         logging.info("Acessando SIGAA")

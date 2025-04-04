@@ -7,13 +7,13 @@ from scraper.extractor import extract_and_save_grades
 
 def get_all_turmas(page):
     """
-    Retrieve all available turmas (classes) from the "Trocar de Turma" menu.
+    Recupera todas as turmas disponíveis no menu "Trocar de Turma".
 
     Args:
-        page: The browser page
+        page: A página do navegador.
 
     Returns:
-        list: A list of turma names
+        list: Uma lista com os nomes das turmas.
     """
     try:
         logging.info("Identificando todas as turmas disponíveis")
@@ -35,13 +35,13 @@ def get_all_turmas(page):
 
 def handle_class_switch(page, processed_classes, all_grades, turma_names):
     """
-    Handle switching between classes (turmas) and process their grades.
+    Lida com a troca entre turmas e processa suas notas.
 
     Args:
-        page: The browser page
-        processed_classes (set): Set of already processed classes
-        all_grades (dict): Dictionary to store the extracted grades
-        turma_names (list): List of all turma names
+        page: A página do navegador.
+        processed_classes (set): Conjunto de turmas já processadas.
+        all_grades (dict): Dicionário para armazenar as notas extraídas.
+        turma_names (list): Lista com os nomes de todas as turmas.
     """
     try:
         for turma_name in turma_names:
@@ -82,16 +82,16 @@ def handle_class_switch(page, processed_classes, all_grades, turma_names):
 
 def process_all_courses(page, browser, username, password):
     """
-    Process all courses and extract their grades.
+    Processa todos os cursos e extrai suas notas.
 
     Args:
-        page: The browser page
-        browser: The browser instance
-        username (str): SIGAA username
-        password (str): SIGAA password
+        page: A página do navegador.
+        browser: A instância do navegador.
+        username (str): Nome de usuário do SIGAA.
+        password (str): Senha do SIGAA.
 
     Returns:
-        dict: Dictionary containing all extracted grades
+        dict: Dicionário contendo todas as notas extraídas.
     """
     all_grades = {}
     processed_classes = set()
