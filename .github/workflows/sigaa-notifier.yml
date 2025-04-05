@@ -2,7 +2,8 @@ name: SIGAA Grade Scraper
 
 on:
   schedule:
-    - cron: "*/10 6-23 * * *"  # Runs every 10 minutes between 6:00 and 23:59
+    # Runs every 10 minutes between 5:00 and 23:59 (Brasília time, UTC-3)
+    - cron: "*/10 8-23 * * *"  # 5:00 to 23:59 UTC-3
   workflow_dispatch:
 
 jobs:
