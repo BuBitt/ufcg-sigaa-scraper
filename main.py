@@ -1,7 +1,6 @@
 from playwright.sync_api import sync_playwright
 import os
 import logging
-import colorlog  # Import colorlog for colored logging
 
 from utils.logger import setup_logging
 from utils.file_handler import load_env, load_grades, save_grades, compare_grades
@@ -12,23 +11,13 @@ from notification.telegram import notify_changes
 
 def setup_logging():
     """
-    Configure logging with colors and a standard format.
+    Configure logging with a standard format.
     """
-    handler = colorlog.StreamHandler()
-    handler.setFormatter(
-        colorlog.ColoredFormatter(
-            "%(log_color)s[%(asctime)s] [%(levelname)s] - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-            log_colors={
-                "DEBUG": "cyan",
-                "INFO": "green",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "bold_red",
-            },
-        )
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="[%(asctime)s] [%(levelname)s] - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
-    logging.basicConfig(level=logging.DEBUG, handlers=[handler])
 
 
 def main():
