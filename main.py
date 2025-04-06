@@ -1,12 +1,34 @@
 from playwright.sync_api import sync_playwright
 import os
 import logging
+import colorlog  # Import colorlog for colored logging
 
 from utils.logger import setup_logging
 from utils.file_handler import load_env, load_grades, save_grades, compare_grades
 from scraper.browser import create_browser, close_browser
 from scraper.processor import process_all_courses
 from notification.telegram import notify_changes
+
+
+def setup_logging():
+    """
+    Configure logging with colors and a standard format.
+    """
+    handler = colorlog.StreamHandler()
+    handler.setFormatter(
+        colorlog.ColoredFormatter(
+            "%(log_color)s[%(asctime)s] [%(levelname)s] - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+            log_colors={
+                "DEBUG": "cyan",
+                "INFO": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "bold_red",
+            },
+        )
+    )
+    logging.basicConfig(level=logging.DEBUG, handlers=[handler])
 
 
 def main():
@@ -52,6 +74,7 @@ def main():
 
 if __name__ == "__main__":
     try:
+        setup_logging()  # Ensure logging is set up before running main
         main()
     except Exception as e:
         logging.error(f"Erro fatal: {e}")
