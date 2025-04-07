@@ -13,8 +13,11 @@ SELECTORS = {
     "COMPONENTES": "tbody tr td.descricao a",
     "MENU_ALUNOS": "div.itemMenuHeaderAlunos",
     "VER_NOTAS": "div.itemMenuHeaderAlunos + div a:has-text('Ver Notas')",
+    "VER_NOTAS_ALT1": "a:has-text('Ver Notas')",
+    "VER_NOTAS_ALT2": "a[onclick*='verNotas']",
     "TROCAR_TURMA": "button#formAcoesTurma\\:botaoTrocarTurma",
     "TURMAS": "div#j_id_jsp_1879301362_4 a.linkTurma",
+    "PORTAL_DISCENTE": "a:has-text('Portal Discente')"
 }
 
 
@@ -163,6 +166,80 @@ def handle_class_switch(
         return False
 
 
+@with_retry(max_attempts=2)
+def click_with_fallback(page, selectors: List[str], timeout: int = None) -> bool:
+    """
+    Tenta clicar em um elemento usando vários seletores como fallback.
+    
+    Args:
+        page: A página do navegador.
+        selectors: Lista de seletores CSS para tentar na ordem.
+        timeout: Timeout em ms para espera (usa o padrão se None).
+        
+    Returns:
+        bool: True se o clique foi bem-sucedido, False caso contrário.
+    """
+    if timeout is None:
+        timeout = config.TIMEOUT_DEFAULT // 2  # Usar metade do timeout padrão para cada tentativa
+        
+    for i, selector in enumerate(selectors):
+        try:
+            # Verificar se o elemento existe e está visível
+            if page.locator(selector).count() > 0:
+                logging.info(f"Encontrado elemento para clique", 
+                            extra={"details": f"selector={selector}, attempt={i+1}/{len(selectors)}"})
+                
+                # Esperar o seletor estar visível com timeout reduzido
+                page.wait_for_selector(selector, timeout=timeout, state="visible")
+                page.locator(selector).click()
+                time.sleep(0.5)  # Pequena pausa para garantir que o clique seja processado
+                return True
+        except Exception as e:
+            logging.warning(
+                f"Falha ao clicar usando seletor {i+1}/{len(selectors)}",
+                extra={"details": f"selector={selector}, error={str(e)[:100]}"}
+            )
+    
+    logging.error(
+        f"Não foi possível clicar em nenhum dos {len(selectors)} seletores",
+        extra={"details": f"selectors={', '.join(selectors[:2])}..."}
+    )
+    return False
+
+
+def navigate_back_to_main_page(page) -> bool:
+    """
+    Tenta navegar de volta para a página principal do SIGAA.
+    
+    Args:
+        page: A página do navegador.
+        
+    Returns:
+        bool: True se a navegação foi bem-sucedida, False caso contrário.
+    """
+    try:
+        # Verificar se já estamos na página principal
+        if page.url.endswith("/sigaa/portais/discente/discente.jsf"):
+            return True
+            
+        # Tentar clicar no link para o Portal Discente
+        if click_with_fallback(page, [SELECTORS["PORTAL_DISCENTE"]]):
+            logging.info("Navegado de volta para o Portal Discente")
+            return True
+            
+        # Se não funcionar, tente navegar diretamente para a URL
+        page.goto("https://sigaa.ufcg.edu.br/sigaa/portais/discente/discente.jsf", 
+                  timeout=config.TIMEOUT_DEFAULT)
+        logging.info("Navegado diretamente para o Portal Discente via URL")
+        return True
+    except Exception as e:
+        logging.error(
+            f"Falha ao navegar de volta para a página principal: {e}",
+            extra={"details": f"current_url={page.url}"}
+        )
+        return False
+
+
 @measure_processing_time
 @log_operation(operation_name="Processamento de Componentes")
 def process_all_courses(page, browser, username: str, password: str) -> Dict[str, Any]:
@@ -199,72 +276,112 @@ def process_all_courses(page, browser, username: str, password: str) -> Dict[str
             extra={"details": f"count={component_count}"}
         )
 
-        # MODIFICAÇÃO: Processar apenas o primeiro componente
-        # Isso evita que o script tente processar os outros componentes desnecessariamente
+        # Processar apenas o primeiro componente
         if component_count > 0:
             component_start = time.time()
             logging.info(
-                f"Processando componente curricular",
-                extra={"details": f"index=1/{component_count}"}
+                f"Processando primeiro componente curricular",
+                extra={"details": f"total_disponivel={component_count}"}
             )
             
             # Clicar no primeiro componente curricular
             page.locator(SELECTORS["COMPONENTES"]).first.click()
+            time.sleep(1)  # Pequeno delay para garantir carregamento da página
 
+            # Verificar se o menu "Alunos" está presente
+            alunos_menu_present = page.locator(SELECTORS["MENU_ALUNOS"]).count() > 0
+            
+            if not alunos_menu_present:
+                logging.warning(
+                    "Menu 'Alunos' não encontrado, verificando página atual",
+                    extra={"details": f"url={page.url}"}
+                )
+                # Se estivermos em uma página não esperada, tentar voltar à principal
+                navigate_back_to_main_page(page)
+                return all_grades
+                
             # Expandir o menu "Alunos"
             try:
                 logging.info("Expandindo o menu 'Alunos'")
-                alunos_menu = page.locator("div.itemMenuHeaderAlunos").first
                 page.wait_for_selector(
-                    "div.itemMenuHeaderAlunos",
-                    timeout=config.TIMEOUT_DEFAULT,
+                    SELECTORS["MENU_ALUNOS"],
+                    timeout=config.TIMEOUT_DEFAULT // 2,
+                    state="visible"
                 )
-                alunos_menu.click()
-                time.sleep(0.5)  # Pequeno delay para garantir que o menu expanda
+                page.locator(SELECTORS["MENU_ALUNOS"]).first.click()
+                time.sleep(1)  # Aumentado para garantir que o menu expanda
             except Exception as e:
                 logging.error(
                     f"Erro ao expandir o menu 'Alunos': {e}",
                     extra={"details": f"component_index=1"}
                 )
+                # Continua tentando clicar em Ver Notas mesmo assim
 
-            # Clicar em "Ver Notas"
+            # Clicar em "Ver Notas" com fallback para seletores alternativos
             try:
                 logging.info("Clicando em 'Ver Notas'")
-                page.wait_for_selector(
-                    "div.itemMenuHeaderAlunos + div a:has-text('Ver Notas')",
-                    timeout=config.TIMEOUT_DEFAULT,
+                ver_notas_clicked = click_with_fallback(
+                    page, 
+                    [
+                        SELECTORS["VER_NOTAS"],
+                        SELECTORS["VER_NOTAS_ALT1"],
+                        SELECTORS["VER_NOTAS_ALT2"]
+                    ],
+                    config.TIMEOUT_DEFAULT // 2
                 )
-                page.locator(
-                    "div.itemMenuHeaderAlunos + div a:has-text('Ver Notas')"
-                ).click()
+                
+                if not ver_notas_clicked:
+                    logging.error("Não foi possível clicar em 'Ver Notas' após múltiplas tentativas")
+                    return all_grades
+                    
+                time.sleep(1)  # Espera para carregamento da página
+                
             except Exception as e:
                 logging.error(
                     f"Erro ao clicar em 'Ver Notas': {e}",
                     extra={"details": f"component_index=1"}
                 )
+                return all_grades
 
-            # Extrair notas do componente principal
-            extract_and_save_grades(page, all_grades)
+            # Extrair notas do componente principal com tratamento de erro
+            try:
+                extract_and_save_grades(page, all_grades)
+            except Exception as e:
+                logging.error(
+                    f"Erro ao extrair notas do componente principal: {e}",
+                    extra={"details": f"component_index=1"}
+                )
+                # Verificamos se conseguimos capturar o título do componente para registrar uma entrada vazia
+                try:
+                    if page.locator("h3").count() > 0:
+                        component_name = page.locator("h3").text_content().strip()
+                        all_grades[component_name] = "Erro ao extrair notas"
+                        logging.info(f"Registrado erro para o componente {component_name}")
+                except Exception:
+                    pass
 
-            # Verificar turmas disponíveis
+            # Verificar turmas disponíveis (se conseguiu acessar a página de notas)
             try:
                 logging.info("Identificando todas as turmas disponíveis")
+                # Tentar voltar para a página anterior
                 page.go_back()
-                page.wait_for_selector(
-                    "button#formAcoesTurma\\:botaoTrocarTurma",
-                    timeout=config.TIMEOUT_DEFAULT,
-                )
-                page.locator("button#formAcoesTurma\\:botaoTrocarTurma").click()
+                time.sleep(1)  # Espera para carregamento
+                
+                # Verificar se o botão de trocar turma está presente
+                if page.locator(SELECTORS["TROCAR_TURMA"]).count() > 0:
+                    page.locator(SELECTORS["TROCAR_TURMA"]).click()
+                    time.sleep(1)  # Espera para carregamento
+                    
+                    turma_names = get_all_turmas(page)
 
-                turma_names = get_all_turmas(page)
-
-                # Processar todas as turmas deste componente
-                if turma_names:
-                    handle_class_switch(page, processed_classes, all_grades, turma_names)
-                    logging.info("Todas as turmas foram processadas")
+                    # Processar todas as turmas deste componente
+                    if turma_names:
+                        handle_class_switch(page, processed_classes, all_grades, turma_names)
+                        logging.info("Todas as turmas foram processadas")
+                    else:
+                        logging.info("Nenhuma turma adicional encontrada")
                 else:
-                    logging.info("Nenhuma turma adicional encontrada")
-
+                    logging.warning("Botão 'Trocar Turma' não encontrado")
             except Exception as e:
                 logging.warning(
                     f"Erro ao processar turmas adicionais: {e}",
@@ -272,18 +389,27 @@ def process_all_courses(page, browser, username: str, password: str) -> Dict[str
                 )
                 
             component_time = time.time() - component_start
-            logging.info(
-                f"Componente processado",
-                extra={
-                    "details": f"index=1/{component_count}, time={component_time:.2f}s"
-                }
-            )
+            # Atualizar a mensagem para refletir que processamos todas as turmas
+            if len(processed_classes) > 0:
+                logging.info(
+                    f"Componente e todas as turmas processados",
+                    extra={
+                        "details": f"turmas={len(processed_classes)}, time={component_time:.2f}s"
+                    }
+                )
+            else:
+                logging.info(
+                    f"Componente processado",
+                    extra={
+                        "details": f"time={component_time:.2f}s"
+                    }
+                )
         else:
             logging.warning("Nenhum componente curricular encontrado")
 
         total_time = time.time() - start_time
         logging.info(
-            f"Processamento de todos os componentes concluído",
+            f"Processamento de componentes concluído",
             extra={
                 "details": f"components={len(all_grades)}, time={total_time:.2f}s"
             }
@@ -296,5 +422,9 @@ def process_all_courses(page, browser, username: str, password: str) -> Dict[str
             exc_info=True,
             extra={"details": "function=process_all_courses"}
         )
+        # Não precisamos mais tentar navegar de volta para a página principal
+        # já que vamos fechar o navegador logo em seguida
 
+    # Este bloco será executado apenas em caso de exceção
+    total_time = time.time() - start_time
     return all_grades
