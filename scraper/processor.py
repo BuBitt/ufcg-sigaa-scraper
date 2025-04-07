@@ -1,5 +1,6 @@
 import logging
 import time
+import os
 from typing import List, Dict, Any, Set, Optional
 import config
 from functools import wraps
@@ -179,26 +180,61 @@ def click_with_fallback(page, selectors: List[str], timeout: int = None) -> bool
     Returns:
         bool: True se o clique foi bem-sucedido, False caso contrário.
     """
+    # Detectar se estamos em ambiente CI (GitHub Actions)
+    is_ci = 'CI' in os.environ or 'GITHUB_ACTIONS' in os.environ
+    
     if timeout is None:
-        timeout = config.TIMEOUT_DEFAULT // 2  # Usar metade do timeout padrão para cada tentativa
+        # Aumentar timeout em ambientes CI
+        timeout = config.TIMEOUT_DEFAULT if is_ci else config.TIMEOUT_DEFAULT // 2
+    
+    # Log do ambiente para debug
+    if is_ci:
+        logging.info("Executando em ambiente CI - timeout ajustado", 
+                    extra={"details": f"timeout={timeout}ms"})
         
     for i, selector in enumerate(selectors):
         try:
+            # Melhorar a descrição do log para mostrar URLs para diagnóstico
+            logging.info(f"Tentando clicar em elemento", 
+                        extra={"details": f"url={page.url}, selector={selector}"})
+            
             # Verificar se o elemento existe e está visível
             if page.locator(selector).count() > 0:
-                logging.info(f"Encontrado elemento para clique", 
+                logging.info(f"Elemento encontrado", 
                             extra={"details": f"selector={selector}, attempt={i+1}/{len(selectors)}"})
                 
-                # Esperar o seletor estar visível com timeout reduzido
+                # Esperar o seletor estar visível com timeout
                 page.wait_for_selector(selector, timeout=timeout, state="visible")
+                
+                # Garantir que a página está estável (sem animações ou carregamentos em andamento)
+                time.sleep(1.0 if is_ci else 0.5)
+                
+                # Clique no elemento
                 page.locator(selector).click()
-                time.sleep(0.5)  # Pequena pausa para garantir que o clique seja processado
+                
+                # Pausa mais longa para ambientes CI
+                wait_time = 2.0 if is_ci else 0.5
+                time.sleep(wait_time)  
+                
+                logging.info("Clique realizado com sucesso",
+                            extra={"details": f"selector={selector}"})
                 return True
+                
         except Exception as e:
             logging.warning(
                 f"Falha ao clicar usando seletor {i+1}/{len(selectors)}",
                 extra={"details": f"selector={selector}, error={str(e)[:100]}"}
             )
+            
+            # No ambiente CI, capturarar mais informações de diagnóstico
+            if is_ci:
+                try:
+                    logging.debug(f"Estado da página: {page.url}", 
+                                 extra={"details": "diagnostico_falha=click_error"})
+                    selectors_visible = [s for s in selectors if page.locator(s).count() > 0]
+                    logging.debug(f"Seletores visíveis: {', '.join(selectors_visible) or 'nenhum'}")
+                except Exception:
+                    pass
     
     logging.error(
         f"Não foi possível clicar em nenhum dos {len(selectors)} seletores",
@@ -265,6 +301,9 @@ def process_all_courses(page, browser, username: str, password: str) -> Dict[str
             logging.error("Não foi possível realizar login, abortando extração")
             return all_grades
 
+        # Estabilizar a navegação após login
+        time.sleep(1)
+
         # Encontrar todos os componentes curriculares
         logging.info("Identificando componentes curriculares")
         page.wait_for_selector(SELECTORS["COMPONENTES"], timeout=config.TIMEOUT_DEFAULT)
@@ -286,8 +325,13 @@ def process_all_courses(page, browser, username: str, password: str) -> Dict[str
             
             # Clicar no primeiro componente curricular
             page.locator(SELECTORS["COMPONENTES"]).first.click()
-            time.sleep(1)  # Pequeno delay para garantir carregamento da página
-
+            
+            # Aumentar tempo de espera para garantir carregamento da página
+            time.sleep(2)
+            
+            # Verificar se estamos na página correta e aguardar estabilidade
+            logging.info(f"Verificando página atual", extra={"details": f"url={page.url}"})
+            
             # Verificar se o menu "Alunos" está presente
             alunos_menu_present = page.locator(SELECTORS["MENU_ALUNOS"]).count() > 0
             
@@ -299,47 +343,66 @@ def process_all_courses(page, browser, username: str, password: str) -> Dict[str
                 # Se estivermos em uma página não esperada, tentar voltar à principal
                 navigate_back_to_main_page(page)
                 return all_grades
-                
-            # Expandir o menu "Alunos"
+            
+            # Expandir o menu "Alunos" com timeout completo
             try:
                 logging.info("Expandindo o menu 'Alunos'")
                 page.wait_for_selector(
                     SELECTORS["MENU_ALUNOS"],
-                    timeout=config.TIMEOUT_DEFAULT // 2,
+                    timeout=config.TIMEOUT_DEFAULT,
                     state="visible"
                 )
+                # Aguardar estabilidade da página
+                time.sleep(1)
+                
+                # Clicar no menu
                 page.locator(SELECTORS["MENU_ALUNOS"]).first.click()
-                time.sleep(1)  # Aumentado para garantir que o menu expanda
+                
+                # Aguardar expansão do menu
+                time.sleep(2)
+                
+                # Verificar se o menu expandiu corretamente
+                expanded_menu_items_count = page.locator("div.itemMenuHeaderAlunos + div a").count()
+                logging.info(f"Menu expandido", 
+                            extra={"details": f"itens_visiveis={expanded_menu_items_count}"})
+                    
             except Exception as e:
                 logging.error(
                     f"Erro ao expandir o menu 'Alunos': {e}",
-                    extra={"details": f"component_index=1"}
+                    extra={"details": f"component_index=1, url={page.url}"}
                 )
                 # Continua tentando clicar em Ver Notas mesmo assim
 
             # Clicar em "Ver Notas" com fallback para seletores alternativos
             try:
                 logging.info("Clicando em 'Ver Notas'")
+                
+                # Adicionar mais alternativas de seletores
                 ver_notas_clicked = click_with_fallback(
                     page, 
                     [
                         SELECTORS["VER_NOTAS"],
                         SELECTORS["VER_NOTAS_ALT1"],
-                        SELECTORS["VER_NOTAS_ALT2"]
+                        SELECTORS["VER_NOTAS_ALT2"],
+                        "a:has-text('Notas')",
+                        "a[onclick*='verNota']",
+                        "div.itemMenuHeaderAlunos + div > a",  # Primeiro link após o menu Alunos
                     ],
-                    config.TIMEOUT_DEFAULT // 2
+                    config.TIMEOUT_DEFAULT
                 )
                 
                 if not ver_notas_clicked:
                     logging.error("Não foi possível clicar em 'Ver Notas' após múltiplas tentativas")
                     return all_grades
-                    
-                time.sleep(1)  # Espera para carregamento da página
+                
+                # Aguardar carregamento da página completo
+                page.wait_for_load_state("networkidle", timeout=config.TIMEOUT_DEFAULT)
+                time.sleep(2)
                 
             except Exception as e:
                 logging.error(
                     f"Erro ao clicar em 'Ver Notas': {e}",
-                    extra={"details": f"component_index=1"}
+                    extra={"details": f"component_index=1, url={page.url}"}
                 )
                 return all_grades
 
