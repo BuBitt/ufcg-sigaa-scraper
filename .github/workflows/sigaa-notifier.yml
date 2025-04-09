@@ -49,10 +49,20 @@ jobs:
 
       - name: Download grades cache from previous run
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: grades-cache
           path: .
           merge-multiple: true
+
+      - name: Create empty cache file if not exists
+        run: |
+          if [ ! -f grades_cache.json ]; then
+            echo "{}" > grades_cache.json
+            echo "Created empty grades_cache.json file as none existed from previous runs"
+          else
+            echo "Using existing grades_cache.json from previous run"
+          fi
 
       - name: Set environment variables
         run: |
