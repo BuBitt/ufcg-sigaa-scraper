@@ -10,6 +10,9 @@ on:
 jobs:
   scrape-grades:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
 
     steps:
       - name: Checkout repository
@@ -47,20 +50,30 @@ jobs:
         run: |
           playwright install chromium
 
-      - name: Restore grades cache 
-        id: cache-restore
-        uses: actions/cache/restore@v4
+      - name: Download grades cache from previous workflow
+        id: download-grades-cache
+        continue-on-error: true
+        uses: dawidd6/action-download-artifact@v2
         with:
-          path: ./grades_cache.json
-          key: grades-cache-${{ github.ref_name }}
-          restore-keys: |
-            grades-cache-
+          workflow: sigaa-notifier.yml
+          name: grades-cache
+          path: .
+          check_artifacts: true
+          search_artifacts: true
+          skip_unpack: false
+          if_no_artifact_found: warn
 
-      - name: Create empty cache file if needed
-        if: steps.cache-restore.outputs.cache-hit != 'true'
+      - name: Debug - List downloaded files
         run: |
-          echo "{}" > grades_cache.json
-          echo "Created new empty grades_cache.json file as no cache was found"
+          ls -la
+          if [ -f "grades_cache.json" ]; then
+            echo "grades_cache.json exists, size: $(stat -c%s grades_cache.json) bytes"
+            echo "Content preview:"
+            head -10 grades_cache.json
+          else
+            echo "grades_cache.json does NOT exist, creating empty file"
+            echo "{}" > grades_cache.json
+          fi
 
       - name: Set environment variables
         run: |
@@ -73,11 +86,17 @@ jobs:
       - name: Run SIGAA Scraper
         run: python main.py
 
-      - name: Show updated cache content
-        run: cat grades_cache.json | head -20
+      - name: Debug - Show updated file
+        run: |
+          echo "Updated grades_cache.json size: $(stat -c%s grades_cache.json) bytes"
+          echo "Content preview:"
+          head -10 grades_cache.json
 
-      - name: Save updated grades cache
-        uses: actions/cache/save@v4
+      - name: Upload grades cache for next workflow
+        uses: actions/upload-artifact@v4
         with:
-          path: ./grades_cache.json
-          key: grades-cache-${{ github.ref_name }}-${{ github.run_id }}
+          name: grades-cache
+          path: grades_cache.json
+          retention-days: 90
+          overwrite: true
+          if-no-files-found: error
