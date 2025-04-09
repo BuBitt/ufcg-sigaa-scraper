@@ -47,17 +47,17 @@ jobs:
         run: |
           playwright install chromium
 
-      - name: Cache grades data
-        id: cache-grades
-        uses: actions/cache@v4
+      - name: Restore grades cache 
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: ./grades_cache.json
-          key: grades-cache-${{ github.run_id }}-${{ github.run_attempt }}
+          key: grades-cache-${{ github.ref_name }}
           restore-keys: |
             grades-cache-
 
       - name: Create empty cache file if needed
-        if: steps.cache-grades.outputs.cache-hit != 'true'
+        if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
           echo "{}" > grades_cache.json
           echo "Created new empty grades_cache.json file as no cache was found"
@@ -72,3 +72,12 @@ jobs:
 
       - name: Run SIGAA Scraper
         run: python main.py
+
+      - name: Show updated cache content
+        run: cat grades_cache.json | head -20
+
+      - name: Save updated grades cache
+        uses: actions/cache/save@v4
+        with:
+          path: ./grades_cache.json
+          key: grades-cache-${{ github.ref_name }}-${{ github.run_id }}
