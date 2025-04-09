@@ -48,21 +48,29 @@ jobs:
           playwright install chromium
 
       - name: Download grades cache from previous run
+        id: download-artifact
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          name: grades-cache
+          name: grades_cache
           path: .
-          merge-multiple: true
 
-      - name: Create empty cache file if not exists
+      - name: Check if download succeeded
+        id: check-artifact
         run: |
-          if [ ! -f grades_cache.json ]; then
-            echo "{}" > grades_cache.json
-            echo "Created empty grades_cache.json file as none existed from previous runs"
+          if [ -f "grades_cache.json" ]; then
+            echo "Artifact download successful"
+            echo "cache_exists=true" >> $GITHUB_OUTPUT
           else
-            echo "Using existing grades_cache.json from previous run"
+            echo "No artifact found, will create new cache file"
+            echo "cache_exists=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Create empty cache file if needed
+        if: steps.check-artifact.outputs.cache_exists != 'true'
+        run: |
+          echo "{}" > grades_cache.json
+          echo "Created new empty grades_cache.json file"
 
       - name: Set environment variables
         run: |
@@ -78,7 +86,7 @@ jobs:
       - name: Upload grades cache for next run
         uses: actions/upload-artifact@v4
         with:
-          name: grades-cache
+          name: grades_cache
           path: grades_cache.json
           retention-days: 7
           if-no-files-found: error
