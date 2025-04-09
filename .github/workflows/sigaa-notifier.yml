@@ -48,12 +48,11 @@ jobs:
           playwright install chromium
 
       - name: Download grades cache from previous run
-        uses: dawidd6/action-download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: grades-cache
           path: .
-          if_no_artifact_found: warn
-          workflow_conclusion: success
+          merge-multiple: true
 
       - name: Set environment variables
         run: |
@@ -67,7 +66,7 @@ jobs:
         run: python main.py
 
       - name: Upload grades cache for next run
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: grades-cache
           path: grades_cache.json
