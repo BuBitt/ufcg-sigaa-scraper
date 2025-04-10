@@ -83,10 +83,6 @@ jobs:
       - name: Run SIGAA Scraper
         run: python main.py
 
-      - name: Debug - Show updated file
-        run: |
-          echo "Updated grades_cache.json size: $(stat -c%s grades_cache.json) bytes"
-
       - name: Upload grades cache for next workflow
         uses: actions/upload-artifact@v4
         with:
