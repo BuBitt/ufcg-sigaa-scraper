@@ -207,14 +207,23 @@ def click_with_fallback(page, selectors: List[str], timeout: int = None) -> bool
                 page.wait_for_selector(selector, timeout=timeout, state="visible")
                 
                 # Garantir que a página está estável (sem animações ou carregamentos em andamento)
-                time.sleep(1.0 if is_ci else 0.5)
+                time.sleep(0.3 if is_ci else 0.2)
                 
-                # Clique no elemento
-                page.locator(selector).click()
+                # Preparar para navegação com timeout mais longo para ambientes CI
+                try:
+                    with page.expect_navigation(timeout=timeout * 1.5):  # 50% mais tempo para navegação
+                        page.locator(selector).click()
+                except Exception as e:
+                    # Se falhar a espera por navegação, podemos ter clicado em algo que não navega
+                    # Ou a página pode ainda estar carregando lentamente
+                    logging.warning(f"Navegação não detectada após clique: {str(e)[:100]}",
+                                  extra={"details": f"selector={selector}, trying to continue"})
+                    # Tente clicar novamente sem esperar navegação
+                    page.locator(selector).click()
                 
-                # Pausa mais longa para ambientes CI
-                wait_time = 2.0 if is_ci else 0.5
-                time.sleep(wait_time)  
+                # Esperar que a página se estabilize
+                wait_time = 0.8 if is_ci else 0.3
+                time.sleep(wait_time)
                 
                 logging.info("Clique realizado com sucesso",
                             extra={"details": f"selector={selector}"})
@@ -395,10 +404,30 @@ def process_all_courses(page, browser, username: str, password: str) -> Dict[str
                     logging.error("Não foi possível clicar em 'Ver Notas' após múltiplas tentativas")
                     return all_grades
                 
-                # Aguardar carregamento da página completo
-                page.wait_for_load_state("networkidle", timeout=config.TIMEOUT_DEFAULT)
-                time.sleep(2)
-                
+                # Aguardar carregamento da página completo com tratamento mais robusto
+                try:
+                    # Tentar esperar pelo carregamento com timeout ampliado
+                    logging.info("Aguardando carregamento da página de notas")
+                    page.wait_for_load_state("networkidle", timeout=config.TIMEOUT_DEFAULT * 1.5)
+                    
+                    # Tentar aguardar elementos típicos da página de notas
+                    note_selectors = ["table.tabelaRelatorio", "div:has-text('Ainda não foram lançadas notas')"]
+                    for selector in note_selectors:
+                        if page.locator(selector).count() > 0:
+                            logging.info(f"Elemento da página de notas encontrado: {selector}")
+                            break
+                    
+                    # Continuar mesmo se não encontrar elementos específicos
+                    logging.info("Página carregada, continuando processamento")
+                    time.sleep(0.8)
+                    
+                except Exception as e:
+                    logging.warning(
+                        f"Timeout ao esperar carregamento da página de notas: {str(e)[:100]}",
+                        extra={"details": f"url={page.url}, continuando mesmo assim"}
+                    )
+                    # Continuar processamento mesmo após timeout
+                    
             except Exception as e:
                 logging.error(
                     f"Erro ao clicar em 'Ver Notas': {e}",
