@@ -65,11 +65,8 @@ jobs:
 
       - name: Debug - List downloaded files
         run: |
-          ls -la
           if [ -f "grades_cache.json" ]; then
             echo "grades_cache.json exists, size: $(stat -c%s grades_cache.json) bytes"
-            echo "Content preview:"
-            head -10 grades_cache.json
           else
             echo "grades_cache.json does NOT exist, creating empty file"
             echo "{}" > grades_cache.json
@@ -89,8 +86,6 @@ jobs:
       - name: Debug - Show updated file
         run: |
           echo "Updated grades_cache.json size: $(stat -c%s grades_cache.json) bytes"
-          echo "Content preview:"
-          head -10 grades_cache.json
 
       - name: Upload grades cache for next workflow
         uses: actions/upload-artifact@v4
