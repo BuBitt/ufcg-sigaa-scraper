@@ -1,8 +1,8 @@
 name: SIGAA Grade Scraper
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"
+  #schedule:
+    # - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
