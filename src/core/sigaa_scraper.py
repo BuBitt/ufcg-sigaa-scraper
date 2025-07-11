@@ -35,7 +35,7 @@ class SIGAAScraper:
     def __init__(self) -> None:
         """Inicializa o scraper com todos os serviços necessários."""
         setup_logger()
-        self.config = Config()
+        # Config é uma classe com atributos estáticos, não precisa instanciar
         self.auth_service = AuthService()
         self.navigation_service = NavigationService()
         self.grade_extractor = GradeExtractor()
@@ -56,11 +56,11 @@ class SIGAAScraper:
         logging.info("Iniciando processo de scraping do SIGAA")
         
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=self.config.HEADLESS_BROWSER)
+            browser = playwright.chromium.launch(headless=Config.HEADLESS_BROWSER)
             context = browser.new_context(
                 viewport={
-                    "width": self.config.VIEWPORT_WIDTH, 
-                    "height": self.config.VIEWPORT_HEIGHT
+                    "width": Config.VIEWPORT_WIDTH, 
+                    "height": Config.VIEWPORT_HEIGHT
                 }
             )
             page = context.new_page()

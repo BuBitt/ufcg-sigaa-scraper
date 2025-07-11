@@ -3,11 +3,10 @@ Serviço de autenticação no SIGAA.
 """
 
 import logging
-import os
 from playwright.sync_api import Page
 
 from src.config.settings import Config
-from src.utils.env_loader import load_environment
+from src.utils.env_singleton import get_env
 
 
 class AuthService:
@@ -15,9 +14,8 @@ class AuthService:
     
     def __init__(self) -> None:
         """Inicializa o serviço de autenticação."""
-        load_environment()
-        self.username = os.getenv("SIGAA_USERNAME")
-        self.password = os.getenv("SIGAA_PASSWORD")
+        self.username = get_env("SIGAA_USERNAME")
+        self.password = get_env("SIGAA_PASSWORD")
         
         if not self.username or not self.password:
             raise ValueError("SIGAA_USERNAME e SIGAA_PASSWORD devem estar definidos no .env")

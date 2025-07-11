@@ -68,21 +68,25 @@ class GradeExtractor:
         Returns:
             Dicionário com informações padronizadas da nota
         """
+        # Otimização: função helper para normalizar valores
+        def normalize_value(value: str) -> str:
+            return "" if value == "--" else value
+        
         return {
             "Semestre": semester,
             "Código": cols[0],
             "Disciplina": cols[1],
-            "Unidade 1": "" if cols[2] == "--" else cols[2],
-            "Unidade 2": "" if cols[3] == "--" else cols[3],
-            "Unidade 3": "" if cols[4] == "--" else cols[4],
-            "Unidade 4": "" if cols[5] == "--" else cols[5],
-            "Unidade 5": "" if cols[6] == "--" else cols[6],
-            "Unidade 6": "" if cols[7] == "--" else cols[7],
-            "Unidade 7": "" if cols[8] == "--" else cols[8],
-            "Unidade 8": "" if cols[9] == "--" else cols[9],
-            "Unidade 9": "" if cols[10] == "--" else cols[10],
-            "Recuperação": "" if cols[11] == "--" else cols[11],
-            "Resultado": "" if cols[12] == "--" else cols[12],
+            "Unidade 1": normalize_value(cols[2]),
+            "Unidade 2": normalize_value(cols[3]),
+            "Unidade 3": normalize_value(cols[4]),
+            "Unidade 4": normalize_value(cols[5]),
+            "Unidade 5": normalize_value(cols[6]),
+            "Unidade 6": normalize_value(cols[7]),
+            "Unidade 7": normalize_value(cols[8]),
+            "Unidade 8": normalize_value(cols[9]),
+            "Unidade 9": normalize_value(cols[10]),
+            "Recuperação": normalize_value(cols[11]),
+            "Resultado": normalize_value(cols[12]),
             "Faltas": cols[13],
             "Situação": cols[14],
         }

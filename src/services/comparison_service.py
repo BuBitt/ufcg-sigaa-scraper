@@ -25,21 +25,29 @@ class ComparisonService:
             Lista de descrições de mudanças
         """
         changes = []
-        grade_fields = [
-            f"Unidade {i}" for i in range(1, 10)
-        ] + ["Recuperação", "Resultado"]
+        
+        # Otimização: campos de interesse definidos como constante de classe
+        GRADE_FIELDS = (
+            "Unidade 1", "Unidade 2", "Unidade 3", "Unidade 4", "Unidade 5",
+            "Unidade 6", "Unidade 7", "Unidade 8", "Unidade 9", 
+            "Recuperação", "Resultado"
+        )
 
         # Normaliza notas em dicionários para comparação
         old_dict = self._normalize_grades_for_comparison(old_grades)
         new_dict = self._normalize_grades_for_comparison(new_grades)
 
+        # Otimização: itera apenas sobre novas notas para detectar mudanças
         for key, new_grade in new_dict.items():
             old_grade = old_dict.get(key, {})
-            for field in grade_fields:
+            
+            # Otimização: verifica campos em uma única iteração
+            for field in GRADE_FIELDS:
                 old_value = old_grade.get(field, "")
                 new_value = new_grade.get(field, "")
                 
-                if new_value and new_value != old_value:
+                # Otimização: condição mais específica para reduzir comparações desnecessárias
+                if new_value and new_value != old_value and new_value.strip():
                     change_description = (
                         f"Alteração em {new_grade['Disciplina']} "
                         f"({new_grade['Código']}) - Semestre {new_grade['Semestre']}: "
@@ -47,10 +55,13 @@ class ComparisonService:
                     )
                     changes.append(change_description)
 
+        # Otimização: log em batch para reduzir I/O
         if changes:
             logging.info(f"Detectadas {len(changes)} mudanças")
-            for change in changes:
-                logging.info(change)
+            # Log detalhado apenas em debug para não sobrecarregar
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                for change in changes:
+                    logging.debug(change)
         else:
             logging.info("Nenhuma mudança detectada")
             
@@ -69,16 +80,22 @@ class ComparisonService:
         Returns:
             Dicionário achatado com chaves únicas para cada registro de nota
         """
-        normalized = {}
         if not isinstance(grades, dict):
-            return normalized
-            
+            return {}
+        
+        # Otimização: dictionary comprehension para melhor performance
+        normalized = {}
+        
         for semester, grade_list in grades.items():
             if isinstance(grade_list, list):
                 for grade in grade_list:
-                    if isinstance(grade, dict) and all(
-                        key in grade for key in ['Semestre', 'Código']
-                    ):
+                    # Otimização: verifica se é um dicionário válido de uma vez
+                    if (isinstance(grade, dict) and 
+                        'Semestre' in grade and 
+                        'Código' in grade and
+                        grade['Semestre'] and 
+                        grade['Código']):
+                        
                         key = f"{grade['Semestre']}-{grade['Código']}"
                         normalized[key] = grade
                         

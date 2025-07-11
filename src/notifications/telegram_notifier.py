@@ -3,13 +3,12 @@ Módulo de notificação via Telegram.
 """
 
 import logging
-import os
 from typing import Dict, List, Optional, Set
 
 import requests
 
 from src.config.settings import Config
-from src.utils.env_loader import load_environment
+from src.utils.env_singleton import get_env
 
 
 class TelegramNotifier:
@@ -26,16 +25,14 @@ class TelegramNotifier:
 
     def _load_credentials(self) -> None:
         """Carrega e valida credenciais do Telegram do ambiente."""
-        load_environment()
-        
-        self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        self.bot_token = get_env("TELEGRAM_BOT_TOKEN")
         self.group_chat_id = (
-            os.getenv("TELEGRAM_GROUP_CHAT_ID") 
+            get_env("TELEGRAM_GROUP_CHAT_ID") 
             if Config.SEND_TELEGRAM_GROUP 
             else None
         )
         self.private_chat_id = (
-            os.getenv("TELEGRAM_PRIVATE_CHAT_ID") 
+            get_env("TELEGRAM_PRIVATE_CHAT_ID") 
             if Config.SEND_TELEGRAM_PRIVATE 
             else None
         )
