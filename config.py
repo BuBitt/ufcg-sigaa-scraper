@@ -45,3 +45,9 @@ REQUEST_TIMEOUT = 10  # segundos
 # Configurações de arquivo
 MAX_BACKUP_FILES = 3
 JSON_INDENT = 4
+
+# Configurações de extração
+# Escolha do método de extração de notas:
+# "menu_ensino" - Usa o menu Ensino > Consultar Minhas Notas (mais rápido e direto)
+# "materia_individual" - Acessa matéria por matéria pelo menu lateral (método original)
+EXTRACTION_METHOD = os.getenv("EXTRACTION_METHOD", "menu_ensino")  # Padrão: menu_ensino

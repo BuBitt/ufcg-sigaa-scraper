@@ -11,6 +11,7 @@ from utils.logger import setup_logging, log_error_and_raise, log_operation
 from utils.file_handler import load_env, load_grades, save_grades, compare_grades
 from scraper.browser import create_browser, close_browser
 from scraper.processor import process_all_courses
+from scraper.menu_navigation import navigate_to_grades_via_menu, extract_grades_from_menu_page
 from notification.telegram import notify_changes
 
 
@@ -86,7 +87,10 @@ def validate_credentials() -> Tuple[str, str]:
             extra={"details": f"file={ENV_FILE}"},
         )
     
-    # Validação básica de formato
+    # Assert para garantir que username e password não são None após a verificação
+    assert username is not None and password is not None
+    
+    # Validação básica de formato (agora sabemos que não são None)
     if len(username) < 3 or len(password) < 6:
         log_error_and_raise(
             "Credenciais SIGAA inválidas: formato incorreto",
@@ -102,6 +106,9 @@ def validate_credentials() -> Tuple[str, str]:
 def process_grades(page: Page, browser: Browser, username: str, password: str) -> Dict[str, Any]:
     """
     Processa e recupera as notas do SIGAA, com mecanismo de retry.
+    Escolhe entre duas rotas baseado na configuração EXTRACTION_METHOD:
+    - "menu_ensino": Menu Ensino > Consultar Minhas Notas (mais rápido)
+    - "materia_individual": Acessa matéria por matéria (método original)
     
     Args:
         page: Objeto de página do navegador.
@@ -116,30 +123,87 @@ def process_grades(page: Page, browser: Browser, username: str, password: str) -
     retry_count = 0
     last_error = None
     
+    # Verificar método de extração configurado
+    extraction_method = config.EXTRACTION_METHOD.lower()
+    if extraction_method not in ["menu_ensino", "materia_individual"]:
+        logging.warning(
+            f"Método de extração inválido '{extraction_method}', usando 'menu_ensino' por padrão",
+            extra={"details": f"available_methods=['menu_ensino', 'materia_individual']"}
+        )
+        extraction_method = "menu_ensino"
+    
+    logging.info(
+        f"Usando método de extração: {extraction_method}",
+        extra={"details": f"method={extraction_method}"}
+    )
+    
     while retry_count < MAX_RETRIES:
         try:
             logging.info(
                 "Iniciando extração de notas", 
-                extra={"details": f"user={masked_username}, attempt={retry_count+1}/{MAX_RETRIES}"}
+                extra={"details": f"user={masked_username}, method={extraction_method}, attempt={retry_count+1}/{MAX_RETRIES}"}
             )
-            return process_all_courses(page, browser, username, password)
+            
+            if extraction_method == "menu_ensino":
+                return process_grades_via_menu(page, username, password)
+            else:  # materia_individual
+                return process_all_courses(page, browser, username, password)
+                
         except Exception as e:
             last_error = e
             retry_count += 1
             if retry_count < MAX_RETRIES:
                 logging.warning(
                     f"Tentativa {retry_count} falhou, tentando novamente em {RETRY_DELAY} segundos",
-                    extra={"details": f"error={str(e)[:50]}..."},
+                    extra={"details": f"error={str(e)[:50]}..., method={extraction_method}"},
                 )
                 time.sleep(RETRY_DELAY)
             else:
                 logging.error(
                     f"Falha na extração de notas após {MAX_RETRIES} tentativas: {e}",
                     exc_info=True,
-                    extra={"details": "module=process_all_courses"},
+                    extra={"details": f"method={extraction_method}"},
                 )
     
     return {}  # Retorna dict vazio após esgotar tentativas
+
+
+def process_grades_via_menu(page: Page, username: str, password: str) -> Dict[str, Any]:
+    """
+    Processa notas usando o método do menu Ensino > Consultar Minhas Notas.
+    
+    Args:
+        page: Objeto de página do navegador.
+        username: Nome de usuário do SIGAA.
+        password: Senha do SIGAA.
+        
+    Returns:
+        Dict[str, Any]: Dicionário contendo todas as notas extraídas.
+    """
+    from scraper.browser import perform_login
+    
+    # Realizar login
+    if not perform_login(page, username, password):
+        logging.error("Não foi possível realizar login via menu, abortando extração")
+        return {}
+    
+    # Navegar para a página de notas via menu
+    if not navigate_to_grades_via_menu(page):
+        logging.error("Não foi possível navegar para a página de notas via menu")
+        return {}
+    
+    # Extrair notas da página
+    grades = extract_grades_from_menu_page(page)
+    
+    if grades:
+        logging.info(
+            f"Extração via menu concluída com sucesso",
+            extra={"details": f"datasets={len(grades)}"}
+        )
+    else:
+        logging.warning("Nenhuma nota extraída via menu")
+    
+    return grades
 
 
 def handle_grade_changes(all_grades: Dict[str, Any]) -> None:

@@ -5,7 +5,9 @@ Um scraper para verificar e notificar automaticamente quando novas notas são ad
 ## Funcionalidades
 
 - Login automático no SIGAA da UFCG
-- Extração de notas de todos os componentes curriculares e turmas
+- **Dois métodos de extração de notas:**
+  - **Menu Ensino** (recomendado): Acessa via menu Ensino > Consultar Minhas Notas - mais rápido e direto
+  - **Matéria Individual**: Método original que acessa cada matéria separadamente via menu lateral
 - Sistema de cache para detectar novas notas ou alterações
 - Notificações via Telegram (grupo e chat privado) com formato customizado
 - Suporte a múltiplas turmas por componente curricular
@@ -36,10 +38,31 @@ Um scraper para verificar e notificar automaticamente quando novas notas são ad
    ```
    SIGAA_USERNAME=seu_usuario
    SIGAA_PASSWORD=sua_senha
+   EXTRACTION_METHOD=menu_ensino
    TELEGRAM_BOT_TOKEN=seu_token
    TELEGRAM_GROUP_CHAT_ID=-1001234567890
    TELEGRAM_PRIVATE_CHAT_ID=1234567890
    ```
+
+## Configuração de Método de Extração
+
+O sistema oferece dois métodos para extrair notas, configuráveis via `EXTRACTION_METHOD`:
+
+### Menu Ensino (Recomendado)
+```
+EXTRACTION_METHOD=menu_ensino
+```
+- **Vantagens**: Mais rápido, acesso direto via menu
+- **Como funciona**: Navega para Ensino > Consultar Minhas Notas
+- **Ideal para**: Uso regular e automação
+
+### Matéria Individual (Método Original)
+```
+EXTRACTION_METHOD=materia_individual
+```
+- **Vantagens**: Mais detalhado, acessa cada matéria separadamente
+- **Como funciona**: Clica em cada componente curricular e acessa via menu lateral
+- **Ideal para**: Quando o método do menu não funcionar
 
 ## Uso Local
 
@@ -75,7 +98,8 @@ sigaa-grade-scraper/
 ├── main.py                   # Script principal
 ├── scraper/                  # Lógica de extração e processamento
 │   ├── browser.py            # Automação do navegador
-│   ├── processor.py          # Processamento de componentes e turmas
+│   ├── processor.py          # Processamento método matéria individual
+│   ├── menu_navigation.py    # Navegação método menu ensino
 │   └── extractor.py          # Extração de tabelas de notas
 ├── notification/             # Sistema de notificações
 │   └── telegram.py           # Notificações via Telegram
