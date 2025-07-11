@@ -213,3 +213,9 @@ grades_cache.json
 script.log
 old_files
 OTIMIZACAO.md
+# Arquivos específicos do projeto
+.env
+grades_cache.json
+script.log
+*.csv
+grades_export.csv
