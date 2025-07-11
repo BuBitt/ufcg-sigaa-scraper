@@ -1,21 +1,31 @@
-name: SIGAA Grade Scraper
+name: 🎓 UFCG SIGAA Grade Scraper
 
 on:
   schedule:
-    - cron: "*/15 * * * *"  # Roda a cada 15 minutos
-  workflow_dispatch:
+    - cron: "*/15 * * * *" # Executa a cada 15 minutos
+  workflow_dispatch: # Permite execução manual
 
 jobs:
   scrape-grades:
+    name: 📊 Executar Scraper de Notas
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      # Faz checkout do repositório
-      - name: Checkout repository
+      # 📥 Checkout do código
+      - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # Cache pras dependências Python
-      - name: Cache Python dependencies
+      # 🐍 Configurar Python com cache
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "requirements.txt"
+
+      # 📦 Cache para dependências Python
+      - name: 📦 Cache Python dependencies
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -23,45 +33,39 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Configura o Python
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      # Instala dependências (usa cache se disponível)
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install playwright beautifulsoup4 lxml requests python-dotenv
-
-      # Cache pros binários do Playwright
-      - name: Cache Playwright browsers
-        id: cache-playwright  # Adiciona um ID pro passo
+      # 🎭 Cache para binários do Playwright
+      - name: 🎭 Cache Playwright browsers
+        id: cache-playwright
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ms-playwright  # Caminho correto pro Chromium no Linux
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/sigaa-scraper.py') }}
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-playwright-
+            ${{ runner.os }}-playwright-chromium-
 
-      # Instala os binários do Playwright só se o cache não foi restaurado
-      - name: Install Playwright browsers
-        if: steps.cache-playwright.outputs.cache-hit != 'true'  # Só roda se não houver cache
+      # 🔧 Instalar dependências Python
+      - name: 🔧 Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 🎭 Instalar navegadores Playwright (só se necessário)
+      - name: 🎭 Install Playwright browsers
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: |
           playwright install chromium
 
-      # Cache pro grades_cache.json
-      - name: Cache grades_cache.json
+      # 💾 Cache para arquivo de notas
+      - name: 💾 Cache grades_cache.json
         uses: actions/cache@v4
         with:
           path: grades_cache.json
-          key: ${{ runner.os }}-grades-cache
+          key: ${{ runner.os }}-grades-cache-${{ github.run_number }}
           restore-keys: |
             ${{ runner.os }}-grades-cache-
 
-      # Configura variáveis de ambiente a partir dos secrets
-      - name: Set environment variables
+      # 🔐 Configurar variáveis de ambiente
+      - name: 🔐 Set environment variables
         env:
           SIGAA_USERNAME: ${{ secrets.SIGAA_USERNAME }}
           SIGAA_PASSWORD: ${{ secrets.SIGAA_PASSWORD }}
@@ -75,6 +79,78 @@ jobs:
           echo "TELEGRAM_GROUP_CHAT_ID=$TELEGRAM_GROUP_CHAT_ID" >> .env
           echo "TELEGRAM_PRIVATE_CHAT_ID=$TELEGRAM_PRIVATE_CHAT_ID" >> .env
 
-      # Roda o script principal
-      - name: Run SIGAA Scraper
-        run: python sigaa-scraper.py
+      # 🚀 Executar o SIGAA Scraper
+      - name: 🚀 Run SIGAA Scraper
+        run: |
+          echo "🎯 Iniciando execução do SIGAA Scraper..."
+          python main.py
+          echo "✅ Execução concluída com sucesso!"
+
+      # 📊 Salvar os 2 últimos logs como artifacts
+      - name: 📊 Save recent logs as artifacts
+        if: always()
+        run: |
+          # Criar diretório temporário para os últimos logs
+          mkdir -p temp_logs
+
+          # Copiar apenas os 2 arquivos de log mais recentes
+          if [ -d "logs" ] && [ "$(ls -A logs)" ]; then
+            # Listar arquivos .log por data de modificação e pegar os 2 mais recentes
+            ls -t logs/*.log 2>/dev/null | head -2 | xargs -I {} cp {} temp_logs/ 2>/dev/null || true
+            
+            # Copiar screenshots de erro se existirem
+            find logs -name "*.png" -type f -newer logs/sigaa_scraper.log 2>/dev/null | head -1 | xargs -I {} cp {} temp_logs/ 2>/dev/null || true
+            
+            echo "📁 Logs preparados para artifact:"
+            ls -la temp_logs/ || echo "Nenhum log encontrado"
+          else
+            echo "📂 Diretório logs não encontrado ou vazio"
+            touch temp_logs/no_logs_found.txt
+          fi
+
+      # 📦 Upload dos logs como artifact
+      - name: 📦 Upload logs artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recent-logs-${{ github.run_number }}
+          path: temp_logs/
+          retention-days: 3
+          if-no-files-found: warn # 📈 Resumo da execução
+      - name: 📈 Execution Summary
+        if: always()
+        run: |
+          echo "## 📊 Resumo da Execução" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tempo**: $(date '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+          # Verificar se logs foram gerados
+          if [ -d "logs" ] && [ -f "logs/sigaa_scraper.log" ]; then
+            LOG_SIZE=$(wc -l < logs/sigaa_scraper.log 2>/dev/null || echo "0")
+            echo "- **Logs**: ✅ Gerados com sucesso ($LOG_SIZE linhas)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Artifacts**: 📦 Últimos logs salvos como artifacts" >> $GITHUB_STEP_SUMMARY
+            
+            # Mostrar apenas um resumo das últimas 3 linhas (não todo o log)
+            if [ "$LOG_SIZE" -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 🔍 Resumo final do log:" >> $GITHUB_STEP_SUMMARY
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              tail -3 logs/sigaa_scraper.log 2>/dev/null >> $GITHUB_STEP_SUMMARY
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Logs**: ❌ Não encontrados" >> $GITHUB_STEP_SUMMARY
+            echo "- **Artifacts**: 📦 Marcador de ausência de logs salvo" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Informações sobre cache
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 💾 Status do Cache:" >> $GITHUB_STEP_SUMMARY
+          if [ -f "grades_cache.json" ]; then
+            CACHE_SIZE=$(wc -l < grades_cache.json 2>/dev/null || echo "0")
+            echo "- **Cache de Notas**: ✅ Presente ($CACHE_SIZE linhas)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Cache de Notas**: 🆕 Primeira execução" >> $GITHUB_STEP_SUMMARY
+          fi
