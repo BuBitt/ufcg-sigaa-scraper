@@ -1,7 +1,7 @@
 name: 🎓 UFCG SIGAA Grade Scraper
 
 on:
-  schedule:
+  #schedule:
     #- cron: "0 9-23 * * *" # 6h-20h BRT
     #- cron: "0 0-2 * * *" # 21h-23h BRT (do dia anterior em UTC)
   workflow_dispatch: # Permite execução manual
