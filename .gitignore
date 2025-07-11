@@ -3,6 +3,9 @@ logs
 venv-notion
 venv
 
+# Backup da versão anterior (opcional - remover se não precisar)
+# old_files/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -207,3 +210,5 @@ go.work.sum
 
 notas_completas.csv
 grades_cache.json
+script.log
+old_files
