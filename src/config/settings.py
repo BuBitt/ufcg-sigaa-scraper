@@ -19,8 +19,16 @@ class Config:
     VIEWPORT_HEIGHT: Final[int] = 720
     
     # Configuração de Logging
-    LOG_LEVEL: Final[int] = logging.DEBUG
-    LOG_FILENAME: Final[str] = "script.log"
+    LOG_LEVEL: Final[int] = logging.INFO
+    LOG_FILENAME: Final[str] = "logs/sigaa_scraper.log"
+    LOG_MAX_BYTES: Final[int] = 10 * 1024 * 1024  # 10MB
+    LOG_BACKUP_COUNT: Final[int] = 5
+    LOG_FORMAT_DETAILED: Final[str] = (
+        "%(asctime)s | %(levelname)-8s | %(name)-20s | "
+        "%(funcName)-20s:%(lineno)-4d | %(message)s"
+    )
+    LOG_FORMAT_SIMPLE: Final[str] = "%(asctime)s | %(levelname)-8s | %(message)s"
+    LOG_DATE_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"
     
     # Configuração de Arquivos
     CACHE_FILENAME: Final[str] = "grades_cache.json"
