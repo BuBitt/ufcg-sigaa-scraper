@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright beautifulsoup4 lxml requests python-dotenv
+          pip install -r requirements.txt
 
       - name: Cache Playwright browsers
         id: cache-playwright
@@ -77,6 +77,10 @@ jobs:
           echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env
           echo "TELEGRAM_GROUP_CHAT_ID=${{ secrets.TELEGRAM_GROUP_CHAT_ID }}" >> .env
           echo "TELEGRAM_PRIVATE_CHAT_ID=${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}" >> .env
+          echo "EXTRACTION_METHOD=${{ secrets.EXTRACTION_METHOD }}" >> .env
+
+      - name: Test configuration
+        run: python main.py --test
 
       - name: Run SIGAA Scraper
         run: python main.py
