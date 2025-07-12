@@ -22,6 +22,7 @@ class EnvLoader:
     def load_env_file(self, env_file: str = ".env") -> bool:
         """
         Carrega variáveis de ambiente do arquivo especificado.
+        Prioriza .env.local se existir (para desenvolvimento local).
         
         Args:
             env_file: Nome do arquivo de ambiente
@@ -33,6 +34,18 @@ class EnvLoader:
             self.logger.debug("Variáveis de ambiente já carregadas")
             return True
         
+        # Priorizar .env.local se existir (arquivo pessoal)
+        local_env_path = Path(".env.local")
+        if local_env_path.exists():
+            try:
+                load_dotenv(local_env_path)
+                self._loaded = True
+                self.logger.info(f"✅ Variáveis carregadas de .env.local")
+                return True
+            except Exception as e:
+                self.logger.error(f"Erro ao carregar .env.local: {e}")
+        
+        # Usar arquivo padrão se .env.local não existir
         env_path = Path(env_file)
         
         if not env_path.exists():

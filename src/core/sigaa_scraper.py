@@ -91,12 +91,16 @@ class SIGAAScraper:
             self.logger.debug("🌐 Iniciando navegador")
             self.perf_logger.start_timer("browser_setup")
             
-            browser = playwright.chromium.launch(headless=Config.HEADLESS_BROWSER)
+            browser = playwright.chromium.launch(
+                headless=Config.HEADLESS_BROWSER,
+                slow_mo=500 if not Config.HEADLESS_BROWSER else 0  # Delay apenas em modo debug
+            )
             context = browser.new_context(
                 viewport={
                     "width": Config.VIEWPORT_WIDTH, 
                     "height": Config.VIEWPORT_HEIGHT
-                }
+                },
+                user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             )
             page = context.new_page()
             
@@ -136,10 +140,16 @@ class SIGAAScraper:
                 
                 # Atualização do cache
                 self.perf_logger.start_timer("cache_save")
-                # Converter grades para formato de lista para o cache
-                grades_list = self._convert_grades_to_list(grades)
-                self.cache_service.save_cache(grades_list)
-                cache_time = self.perf_logger.end_timer("cache_save")
+                try:
+                    # Converter grades para formato de lista para o cache
+                    grades_list = self._convert_grades_to_list(grades)
+                    self.cache_service.save_cache(grades_list)
+                    cache_time = self.perf_logger.end_timer("cache_save")
+                except Exception as cache_error:
+                    cache_time = self.perf_logger.end_timer("cache_save")
+                    self.logger.error(f"❌ Falha crítica ao salvar cache: {cache_error}")
+                    # Continuar execução mesmo com falha no cache, mas alertar
+                    self.logger.warning("⚠️  Continuando sem atualizar cache - dados anteriores preservados")
                 
                 # Log de performance
                 total_time = self.perf_logger.end_timer("scraping_total")
@@ -165,13 +175,20 @@ class SIGAAScraper:
             
         Returns:
             Dict: Notas extraídas
+            
+        Raises:
+            ValueError: Se método de extração for inválido
         """
         method = Config.get_extraction_method()
         
+        self.logger.info(f"📊 Método de extração selecionado: {method}")
+        
         if method == "menu_ensino":
             return self._extract_via_menu_ensino(page)
-        else:  # materia_individual
+        elif method == "materia_individual":
             return self._extract_via_materia_individual(page)
+        else:
+            raise ValueError(f"Método de extração inválido: {method}. Use 'menu_ensino' ou 'materia_individual'.")
     
     def _extract_via_menu_ensino(self, page: Page) -> Dict[str, Any]:
         """
@@ -209,20 +226,38 @@ class SIGAAScraper:
         
         self.logger.info(f"📋 Processando {len(components)} componente(s)")
         
-        # Processar apenas o primeiro componente como exemplo
-        # (pode ser expandido para processar todos)
-        if len(components) > 0:
-            component_name = components[0]
-            self.logger.info(f"🎯 Processando: {component_name}")
-            
-            if self.navigation_service.navigate_to_component_grades(page, 0):
-                # Extrair notas do componente
-                component_grades = self.grade_extractor.extract_from_page_direct(page)
-                all_grades[component_name] = component_grades
+        # Processar todos os componentes disponíveis
+        for index, component_name in enumerate(components):
+            try:
+                self.logger.info(f"🎯 Processando ({index + 1}/{len(components)}): {component_name}")
                 
-                # Voltar para página principal
-                self.navigation_service.go_back_to_main(page)
+                if self.navigation_service.navigate_to_component_grades(page, index):
+                    # Extrair notas do componente
+                    component_grades = self.grade_extractor.extract_from_page_direct(page)
+                    
+                    if component_grades:
+                        all_grades[component_name] = component_grades
+                        self.logger.debug(f"✅ Notas extraídas para {component_name}")
+                    else:
+                        self.logger.warning(f"⚠️  Nenhuma nota encontrada para {component_name}")
+                    
+                    # Voltar para página principal
+                    if not self.navigation_service.go_back_to_main(page):
+                        self.logger.warning(f"⚠️  Falha ao voltar à página principal após {component_name}")
+                        break
+                else:
+                    self.logger.warning(f"⚠️  Falha ao navegar para {component_name}")
+                    
+            except Exception as e:
+                self.logger.error(f"❌ Erro ao processar {component_name}: {e}")
+                # Tentar voltar à página principal em caso de erro
+                try:
+                    self.navigation_service.go_back_to_main(page)
+                except:
+                    pass
+                continue
         
+        self.logger.info(f"✅ Processamento concluído: {len(all_grades)} matéria(s) com notas")
         return all_grades
     
     def _convert_grades_to_list(self, grades: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -234,7 +269,14 @@ class SIGAAScraper:
             
         Returns:
             List: Lista de registros de notas
+            
+        Raises:
+            Exception: Se a conversão falhar criticamente
         """
+        if not grades:
+            self.logger.warning("⚠️  Estrutura de notas vazia para conversão")
+            return []
+        
         grades_list = []
         
         try:
@@ -245,14 +287,26 @@ class SIGAAScraper:
                             record_copy = record.copy()
                             record_copy['_secao'] = section_key
                             grades_list.append(record_copy)
+                        else:
+                            self.logger.warning(f"⚠️  Registro inválido ignorado em {section_key}: {type(record)}")
                 elif isinstance(section_data, dict):
                     record_copy = section_data.copy()
                     record_copy['_secao'] = section_key
                     grades_list.append(record_copy)
+                else:
+                    self.logger.warning(f"⚠️  Seção inválida ignorada: {section_key} ({type(section_data)})")
+            
+            if not grades_list:
+                self.logger.error("❌ Conversão resultou em lista vazia - dados podem estar corrompidos")
+                raise Exception("Falha crítica na conversão de dados de notas")
+                
+            self.logger.debug(f"✅ Conversão concluída: {len(grades_list)} registro(s)")
+            return grades_list
+            
         except Exception as e:
-            self.logger.warning(f"⚠️  Erro na conversão para lista: {e}")
-        
-        return grades_list
+            self.logger.error(f"❌ Erro crítico na conversão para lista: {e}")
+            self.logger.error(f"❌ Estrutura recebida: {type(grades)} com {len(grades) if hasattr(grades, '__len__') else 0} item(s)")
+            raise Exception(f"Falha na conversão de cache: {e}") from e
     
     def _log_performance_summary(self, auth_time: float, nav_time: float, 
                                 extract_time: float, comp_time: float, 

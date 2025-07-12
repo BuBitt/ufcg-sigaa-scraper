@@ -3,9 +3,11 @@ Extrator de notas do SIGAA com suporte a múltiplos métodos.
 """
 
 import re
+from datetime import datetime
 from typing import Dict, Any, List
 
 from playwright.sync_api import Page
+from bs4 import BeautifulSoup
 
 from src.config.settings import Config
 from src.utils.logger import get_logger
@@ -19,6 +21,35 @@ class GradeExtractor:
         self.logger = get_logger("grade_extractor")
         self.logger.debug("🔧 Extrator de notas inicializado")
     
+    def extract_from_page_direct(self, page: Page) -> Dict[str, Any]:
+        """
+        Extrai notas diretamente da página usando Playwright.
+        
+        Args:
+            page: Página do navegador
+            
+        Returns:
+            Dict[str, Any]: Notas extraídas organizadas
+        """
+        try:
+            self.logger.info("📊 Extraindo notas da página atual")
+            
+            # Obter conteúdo HTML
+            content = page.content()
+            
+            # Extrair usando BeautifulSoup
+            grades = self.extract_grades(content)
+            
+            # Organizar por semestre/período
+            organized = self.organize_grades_by_semester(grades)
+            
+            self.logger.info(f"✅ Extração concluída: {len(grades)} registro(s)")
+            return organized
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro na extração direta: {e}", exc_info=True)
+            return {}
+    
     def extract_grades(self, page_content: str) -> List[Dict[str, Any]]:
         """
         Extrai notas do conteúdo HTML da página.
@@ -30,8 +61,6 @@ class GradeExtractor:
             List[Dict[str, Any]]: Lista de registros de notas extraídos
         """
         try:
-            from bs4 import BeautifulSoup
-            
             self.logger.info("📊 Iniciando extração de notas do HTML")
             soup = BeautifulSoup(page_content, 'html.parser')
             
@@ -49,7 +78,7 @@ class GradeExtractor:
                     self.logger.warning(f"⚠️  Erro ao processar tabela {i+1}: {e}")
                     continue
             
-            self.logger.info(f"✅ Extração concluída: {len(all_grades)} registro(s) de notas")
+            self.logger.info(f"📊 Total de registros extraídos: {len(all_grades)}")
             return all_grades
             
         except Exception as e:
@@ -65,25 +94,22 @@ class GradeExtractor:
             table_index: Índice da tabela
             
         Returns:
-            List[Dict[str, Any]]: Lista de registros da tabela
+            List[Dict[str, Any]]: Registros da tabela
         """
         grades = []
         
         try:
-            # Encontrar cabeçalho da tabela
-            headers = []
+            # Extrair cabeçalho
             header_row = table.find('tr')
-            if header_row:
-                header_cells = header_row.find_all(['th', 'td'])
-                for cell in header_cells:
-                    header_text = cell.get_text(strip=True)
-                    headers.append(header_text if header_text else f"Coluna_{len(headers)+1}")
-            
-            if not headers:
-                self.logger.warning(f"⚠️  Nenhum cabeçalho encontrado na tabela {table_index+1}")
+            if not header_row:
                 return grades
             
-            # Processar linhas de dados
+            headers = []
+            for th in header_row.find_all(['th', 'td']):
+                text = th.get_text(strip=True)
+                headers.append(text if text else f"Coluna_{len(headers)+1}")
+            
+            # Extrair linhas de dados
             rows = table.find_all('tr')[1:]  # Pular cabeçalho
             
             for row_index, row in enumerate(rows):
@@ -92,211 +118,158 @@ class GradeExtractor:
                     if len(cells) == 0:
                         continue
                     
-                    row_data = {}
+                    record = {
+                        '_tabela_index': table_index,
+                        '_linha_index': row_index,
+                        '_timestamp': datetime.now().isoformat()
+                    }
+                    
+                    # Extrair dados das células
                     for cell_index, cell in enumerate(cells):
+                        header = headers[cell_index] if cell_index < len(headers) else f"Coluna_{cell_index+1}"
                         cell_text = cell.get_text(strip=True)
                         
-                        # Determinar nome da coluna
-                        if cell_index < len(headers):
-                            column_name = headers[cell_index]
-                        else:
-                            column_name = f"Coluna_{cell_index+1}"
+                        record[header] = cell_text
                         
-                        row_data[column_name] = cell_text
+                        # Tentar extrair nota numérica
+                        if self._looks_like_grade(cell_text):
+                            record['_nota_extraida'] = self._normalize_grade(cell_text)
                     
-                    # Adicionar metadados
-                    row_data['_tabela_index'] = table_index
-                    row_data['_linha_index'] = row_index
-                    
-                    # Tentar identificar disciplina/componente
-                    discipline = self._identify_discipline(row_data)
+                    # Identificar disciplina
+                    discipline = self._identify_discipline(record)
                     if discipline:
-                        row_data['_disciplina'] = discipline
+                        record['_disciplina'] = discipline
                     
-                    # Tentar extrair nota
-                    grade = self._extract_grade_value(row_data)
-                    if grade is not None:
-                        row_data['_nota_extraida'] = grade
+                    grades.append(record)
                     
-                    if row_data:  # Só adicionar se tiver dados
-                        grades.append(row_data)
-                        
                 except Exception as e:
                     self.logger.warning(f"⚠️  Erro ao processar linha {row_index+1}: {e}")
                     continue
             
-            self.logger.debug(f"📊 Tabela {table_index+1}: {len(grades)} registro(s) extraídos")
-            return grades
+            self.logger.debug(f"✅ Tabela {table_index+1}: {len(grades)} registro(s) extraídos")
             
         except Exception as e:
             self.logger.error(f"❌ Erro ao extrair tabela {table_index+1}: {e}")
-            return []
+        
+        return grades
     
-    def _identify_discipline(self, row_data: Dict[str, Any]) -> str:
+    def _looks_like_grade(self, text: str) -> bool:
         """
-        Tenta identificar o nome da disciplina nos dados da linha.
+        Verifica se o texto parece uma nota.
         
         Args:
-            row_data: Dados da linha
+            text: Texto a verificar
             
         Returns:
-            str: Nome da disciplina identificada ou string vazia
+            bool: True se parece uma nota
         """
-        # Procurar em campos que comumente contêm o nome da disciplina
+        if not text:
+            return False
+        
+        # Padrões de nota
+        grade_patterns = [
+            r'^\d+[.,]?\d*$',  # 10, 10.0, 10,5
+            r'^\d+[.,]\d+$',   # 10.5, 10,5
+            r'^[0-9]+$'        # 10
+        ]
+        
+        for pattern in grade_patterns:
+            if re.match(pattern, text.strip()):
+                return True
+        
+        return False
+    
+    def _normalize_grade(self, text: str) -> str:
+        """
+        Normaliza formato de nota.
+        
+        Args:
+            text: Texto da nota
+            
+        Returns:
+            str: Nota normalizada
+        """
+        return text.strip().replace(',', '.')
+    
+    def _identify_discipline(self, record: Dict[str, Any]) -> str:
+        """
+        Identifica o nome da disciplina no registro.
+        
+        Args:
+            record: Registro de dados
+            
+        Returns:
+            str: Nome da disciplina ou string vazia
+        """
+        # Campos que podem conter nome da disciplina
         discipline_fields = [
-            'Disciplina', 'Componente', 'Matéria', 'Nome',
-            'Disciplina/Componente', 'Código - Nome'
+            'Disciplina', 'Componente Curricular', 'Nome',
+            'Componente', 'Matéria', 'Código'
         ]
         
         for field in discipline_fields:
-            if field in row_data and row_data[field]:
-                value = str(row_data[field]).strip()
-                if len(value) > 3:  # Nome mínimo razoável
-                    return value
+            if field in record and record[field]:
+                return str(record[field]).strip()
         
-        # Procurar em qualquer campo que tenha texto longo
-        for key, value in row_data.items():
-            if isinstance(value, str) and len(value) > 10:
-                # Verificar se parece ser nome de disciplina
-                if any(word in value.upper() for word in ['CÁLCULO', 'FÍSICA', 'QUÍMICA', 'HISTÓRIA', 'PROGRAMAÇÃO', 'ENGENHARIA']):
-                    return value.strip()
+        # Procurar por texto mais longo (provavelmente disciplina)
+        longest_text = ""
+        for key, value in record.items():
+            if not key.startswith('_') and isinstance(value, str):
+                if len(value.strip()) > len(longest_text) and len(value.strip()) > 10:
+                    longest_text = value.strip()
         
-        return ""
-    
-    def _extract_grade_value(self, row_data: Dict[str, Any]) -> float:
-        """
-        Tenta extrair valor numérico de nota dos dados da linha.
-        
-        Args:
-            row_data: Dados da linha
-            
-        Returns:
-            float or None: Valor da nota ou None se não encontrada
-        """
-        # Campos que comumente contêm notas
-        grade_fields = [
-            'Nota', 'Média', 'Resultado', 'Conceito',
-            'Nota Final', 'Media Final', 'Avaliação'
-        ]
-        
-        for field in grade_fields:
-            if field in row_data and row_data[field]:
-                grade = self._parse_grade_value(str(row_data[field]))
-                if grade is not None:
-                    return grade
-        
-        # Procurar em todos os campos por valores numéricos
-        for key, value in row_data.items():
-            if isinstance(value, str):
-                grade = self._parse_grade_value(value)
-                if grade is not None and 0 <= grade <= 10:  # Range típico de notas
-                    return grade
-        
-        return None
-    
-    def _parse_grade_value(self, text: str) -> float:
-        """
-        Tenta extrair valor numérico de uma string.
-        
-        Args:
-            text: Texto a ser analisado
-            
-        Returns:
-            float or None: Valor numérico ou None se não encontrado
-        """
-        try:
-            # Limpar texto
-            text = text.strip().replace(',', '.')
-            
-            # Procurar por padrão numérico
-            match = re.search(r'\d+\.?\d*', text)
-            if match:
-                value = float(match.group())
-                return value
-                
-        except (ValueError, AttributeError):
-            pass
-        
-        return None
+        return longest_text
     
     def organize_grades_by_semester(self, grades: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
         """
-        Organiza as notas por semestre/período.
+        Organiza notas por semestre/período.
         
         Args:
-            grades: Lista de registros de notas
+            grades: Lista de notas
             
         Returns:
             Dict: Notas organizadas por período
         """
-        organized = {}
-        
         try:
+            organized = {}
+            
             for grade in grades:
                 # Tentar identificar período/semestre
-                semester = self._identify_semester(grade)
+                period = self._identify_period(grade)
                 
-                if semester not in organized:
-                    organized[semester] = []
+                if period not in organized:
+                    organized[period] = []
                 
-                organized[semester].append(grade)
+                organized[period].append(grade)
             
-            self.logger.info(f"📚 Notas organizadas em {len(organized)} período(s)")
+            self.logger.info(f"📅 Notas organizadas em {len(organized)} período(s)")
             return organized
             
         except Exception as e:
-            self.logger.error(f"❌ Erro ao organizar notas por semestre: {e}")
-            return {"Período_Único": grades}
+            self.logger.error(f"❌ Erro ao organizar por semestre: {e}")
+            return {"Periodo_Unico": grades}
     
-    def _identify_semester(self, grade_data: Dict[str, Any]) -> str:
+    def _identify_period(self, grade: Dict[str, Any]) -> str:
         """
-        Tenta identificar o semestre/período de um registro de nota.
+        Identifica o período/semestre de uma nota.
         
         Args:
-            grade_data: Dados do registro de nota
+            grade: Registro de nota
             
         Returns:
-            str: Identificação do período
+            str: Nome do período
         """
         # Procurar campos que indiquem período
         period_fields = ['Período', 'Semestre', 'Ano', 'Turma']
         
         for field in period_fields:
-            if field in grade_data and grade_data[field]:
-                return str(grade_data[field]).strip()
+            if field in grade and grade[field]:
+                return f"{field}_{grade[field]}"
         
-        # Usar índice da tabela como fallback
-        table_index = grade_data.get('_tabela_index', 0)
-        return f"Período_{table_index + 1}"
-    
-    def extract_from_page_direct(self, page: Page) -> Dict[str, Any]:
-        """
-        Extrai notas diretamente da página atual.
+        # Usar disciplina como agrupador
+        if '_disciplina' in grade and grade['_disciplina']:
+            return grade['_disciplina']
         
-        Args:
-            page: Página do navegador
-            
-        Returns:
-            Dict: Notas extraídas organizadas
-        """
-        try:
-            self.logger.info("📊 Extraindo notas da página atual")
-            
-            # Aguardar carregamento das tabelas
-            page.wait_for_selector("table.tabelaRelatorio", timeout=Config.TIMEOUT_DEFAULT)
-            
-            # Obter conteúdo da página
-            content = page.content()
-            
-            # Extrair notas
-            grades = self.extract_grades(content)
-            
-            # Organizar por semestre
-            organized_grades = self.organize_grades_by_semester(grades)
-            
-            self.logger.info(f"✅ Extração direta concluída: {len(organized_grades)} período(s)")
-            return organized_grades
-            
-        except Exception as e:
-            self.logger.error(f"❌ Erro na extração direta: {e}", exc_info=True)
-            return {}
+        # Fallback para tabela
+        table_index = grade.get('_tabela_index', 0)
+        return f"Tabela_{table_index + 1}"

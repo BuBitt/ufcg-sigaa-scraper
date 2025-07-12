@@ -17,8 +17,8 @@ class Config:
     APP_NAME: Final[str] = "SIGAA Grade Scraper"
     
     # Configuração do Navegador
-    HEADLESS_BROWSER: Final[bool] = True
-    TIMEOUT_DEFAULT: Final[int] = 30000  # 30 segundos em milissegundos
+    HEADLESS_BROWSER: Final[bool] = True  # Modo headless para produção
+    TIMEOUT_DEFAULT: Final[int] = 45000  # 45 segundos em milissegundos
     VIEWPORT_WIDTH: Final[int] = 1280
     VIEWPORT_HEIGHT: Final[int] = 720
     

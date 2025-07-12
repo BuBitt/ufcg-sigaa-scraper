@@ -33,6 +33,8 @@ var/
 
 # Environment variables
 .env
+.env.local
+.env.*.local
 
 # Cache files
 grades_cache.json

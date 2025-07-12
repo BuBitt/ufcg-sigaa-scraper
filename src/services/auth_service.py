@@ -81,9 +81,38 @@ class AuthService:
             page.fill("input[name='user.login']", username)
             page.fill("input[name='user.senha']", password)
             
-            # Clicar no botão de login
+            # Debug da página antes do login
+            self._debug_page_elements(page)
+            
+            # Clicar no botão de login - tentar diferentes seletores
             self.logger.debug("🚀 Submetendo formulário de login")
-            page.click("input[type='submit'][value='Acessar']")
+            login_button_found = False
+            
+            # Lista de seletores possíveis para o botão de login
+            login_selectors = [
+                "input[type='submit'][value='Acessar']",
+                "input[value='Acessar']",
+                "button[type='submit']",
+                "#entrar",
+                ".btn-login",
+                "input[type='submit']"
+            ]
+            
+            for selector in login_selectors:
+                try:
+                    if page.locator(selector).count() > 0:
+                        self.logger.debug(f"🎯 Botão encontrado com seletor: {selector}")
+                        page.click(selector)
+                        login_button_found = True
+                        break
+                except Exception as e:
+                    self.logger.debug(f"⚠️  Seletor {selector} não funcionou: {e}")
+                    continue
+            
+            if not login_button_found:
+                # Tentar submeter o formulário diretamente
+                self.logger.debug("🔄 Tentando submeter formulário diretamente")
+                page.press("input[name='user.senha']", "Enter")
             
             # Aguardar redirecionamento
             page.wait_for_load_state("networkidle", timeout=Config.TIMEOUT_DEFAULT)
@@ -181,3 +210,41 @@ class AuthService:
         except Exception as e:
             self.logger.warning(f"⚠️  Erro na verificação de login: {e}")
             return False
+    
+    def _debug_page_elements(self, page: Page) -> None:
+        """
+        Debug dos elementos da página para identificar problemas.
+        
+        Args:
+            page: Página do navegador
+        """
+        try:
+            self.logger.debug("🔍 Inspecionando elementos da página...")
+            
+            # Verificar se está na página de login
+            url = page.url
+            self.logger.debug(f"📍 URL atual: {url}")
+            
+            # Listar todos os inputs type=submit
+            submit_buttons = page.locator("input[type='submit']").all()
+            self.logger.debug(f"🔘 Botões submit encontrados: {len(submit_buttons)}")
+            
+            for i, button in enumerate(submit_buttons):
+                try:
+                    value = button.get_attribute("value")
+                    name = button.get_attribute("name")
+                    self.logger.debug(f"  - Botão {i+1}: value='{value}', name='{name}'")
+                except:
+                    pass
+            
+            # Verificar formulários
+            forms = page.locator("form").all()
+            self.logger.debug(f"📝 Formulários encontrados: {len(forms)}")
+            
+            # Verificar campos de login
+            login_field = page.locator("input[name='user.login']").count()
+            password_field = page.locator("input[name='user.senha']").count()
+            self.logger.debug(f"🔑 Campo login: {login_field}, Campo senha: {password_field}")
+            
+        except Exception as e:
+            self.logger.debug(f"⚠️  Erro no debug: {e}")
