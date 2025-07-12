@@ -1,34 +1,30 @@
 #!/usr/bin/env python3
 """
-Script de teste para verificar a configuração do método de extração.
+Script de teste para verificar a configuração do sistema refatorado.
 """
 
-import os
 import sys
-import config
-from utils.file_handler import load_env
+from src.core.sigaa_scraper import SIGAAScraper
+from src.config.settings import Config
+
 
 def test_extraction_method():
     """Testa a configuração do método de extração."""
     
-    print("🔧 Testando configuração do método de extração...")
+    print("🔧 Testando configuração do sistema refatorado...")
     
-    # Carregar .env se existir
-    try:
-        load_env()
-        print("✅ Arquivo .env carregado")
-    except FileNotFoundError:
-        print("⚠️  Arquivo .env não encontrado, usando configurações padrão")
+    # Criar instância do scraper
+    scraper = SIGAAScraper(debug_mode=True)
     
     # Verificar método configurado
-    method = config.EXTRACTION_METHOD
+    method = Config.get_extraction_method()
     print(f"📊 Método configurado: {method}")
     
-    if method.lower() == "menu_ensino":
+    if method == "menu_ensino":
         print("✅ Usando método Menu Ensino (recomendado)")
         print("   - Mais rápido e direto")
         print("   - Acessa via menu Ensino > Consultar Minhas Notas")
-    elif method.lower() == "materia_individual":
+    elif method == "materia_individual":
         print("✅ Usando método Matéria Individual")
         print("   - Método original")
         print("   - Acessa cada matéria separadamente")
@@ -37,19 +33,26 @@ def test_extraction_method():
     
     # Verificar outras configurações relevantes
     print(f"\n🔍 Outras configurações:")
-    print(f"   - Headless: {config.HEADLESS_BROWSER}")
-    print(f"   - Timeout: {config.TIMEOUT_DEFAULT}ms")
-    print(f"   - Cache: {config.CACHE_FILENAME}")
+    print(f"   - Versão: {Config.VERSION}")
+    print(f"   - Headless: {Config.HEADLESS_BROWSER}")
+    print(f"   - Timeout: {Config.TIMEOUT_DEFAULT}ms")
+    print(f"   - Cache: {Config.CACHE_FILENAME}")
+    print(f"   - Logs: {Config.LOG_FILENAME}")
     
-    # Verificar variáveis de ambiente
-    env_method = os.getenv("EXTRACTION_METHOD")
-    if env_method:
-        print(f"   - EXTRACTION_METHOD definido: {env_method}")
+    # Testar configuração completa
+    print(f"\n🧪 Testando configuração completa...")
+    if scraper.test_configuration():
+        print("✅ Configuração válida!")
     else:
-        print("   - EXTRACTION_METHOD não definido (usando padrão)")
+        print("❌ Problemas na configuração detectados")
     
     print("\n✅ Teste de configuração concluído!")
     return method
 
+
 if __name__ == "__main__":
-    test_extraction_method()
+    try:
+        test_extraction_method()
+    except Exception as e:
+        print(f"❌ Erro durante o teste: {e}")
+        sys.exit(1)
