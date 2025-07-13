@@ -393,9 +393,19 @@ def main() -> None:
                 
                 # Testar notificação se configurada
                 if scraper.notifier.config.get("bot_token"):
-                    logger.info("📬 Testando notificação...")
+                    import os
+                    is_github_actions = os.getenv('GITHUB_ACTIONS', 'false').lower() == 'true'
+                    
+                    if is_github_actions:
+                        logger.info("📬 Validando configuração Telegram (GitHub Actions)...")
+                    else:
+                        logger.info("📬 Testando notificação...")
+                    
                     if scraper.notifier.test_notification():
-                        print("✅ Notificação teste enviada!")
+                        if is_github_actions:
+                            print("✅ Configuração Telegram validada!")
+                        else:
+                            print("✅ Notificação teste enviada!")
                     else:
                         print("⚠️  Falha no teste de notificação")
             else:
@@ -415,11 +425,20 @@ def main() -> None:
             for i, change in enumerate(changes, 1):
                 print(f"   {i}. {change}")
             
-            logger.info("📬 Enviando notificações...")
-            if scraper.notifier.notify_changes(changes):
-                print("📬 Notificações enviadas!")
+            # No GitHub Actions, não envia notificações de mudanças normais
+            # Apenas logs e erros são notificados
+            import os
+            is_github_actions = os.getenv('GITHUB_ACTIONS', 'false').lower() == 'true'
+            
+            if not is_github_actions:
+                logger.info("📬 Enviando notificações...")
+                if scraper.notifier.notify_changes(changes):
+                    print("📬 Notificações enviadas!")
+                else:
+                    print("⚠️  Falha no envio de notificações")
             else:
-                print("⚠️  Falha no envio de notificações")
+                logger.info("📬 Notificações de mudanças desabilitadas no GitHub Actions")
+                print("📬 Mudanças detectadas (notificações desabilitadas no GitHub Actions)")
         else:
             print("ℹ️  Nenhuma mudança detectada nas notas.")
         
@@ -431,6 +450,13 @@ def main() -> None:
         print(f"\n❌ Erro: {e}")
         print("📋 Verifique o arquivo de log para mais detalhes:")
         print(f"   {Config.LOG_FILENAME}")
+        
+        # Enviar notificação de erro apenas para chat privado
+        try:
+            scraper.notifier.notify_error(str(e))
+        except:
+            pass  # Evita erro duplo se notificação falhar
+        
         sys.exit(1)
 
 

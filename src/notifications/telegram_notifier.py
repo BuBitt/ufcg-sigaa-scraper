@@ -272,24 +272,46 @@ class TelegramNotifier:
     def test_notification(self) -> bool:
         """
         Testa conectividade com Telegram enviando mensagem de teste.
+        No GitHub Actions, apenas valida configurações sem enviar mensagem.
         
         Returns:
             bool: True se teste foi bem-sucedido
         """
+        import os
+        
+        # Detecta se está rodando no GitHub Actions
+        is_github_actions = os.getenv('GITHUB_ACTIONS', 'false').lower() == 'true'
+        
+        if is_github_actions:
+            # No GitHub Actions, apenas valida as configurações sem enviar mensagem
+            has_config = bool(
+                self.config.get("bot_token") and 
+                (self.config.get("group_chat_id") or self.config.get("private_chat_id"))
+            )
+            if has_config:
+                self.logger.info("✅ Configuração do Telegram validada (GitHub Actions - sem envio de teste)")
+                return True
+            else:
+                self.logger.warning("⚠️  Configuração do Telegram incompleta")
+                return False
+        
+        # Em ambiente local, envia mensagem de teste normalmente
         try:
             test_message = "🔧 *Teste de Conectividade*\n\nSIGAA Scraper funcionando corretamente!"
             
             success_count = 0
             
             # Testar grupo
-            if self.config.get("group_chat_id"):
-                if self._send_message(self.config["group_chat_id"], test_message + "\n\n📢 Mensagem de teste para o grupo"):
+            group_chat_id = self.config.get("group_chat_id")
+            if group_chat_id:
+                if self._send_message(group_chat_id, test_message + "\n\n📢 Mensagem de teste para o grupo"):
                     success_count += 1
                     self.logger.info("✅ Teste de grupo bem-sucedido")
             
             # Testar privado
-            if self.config.get("private_chat_id"):
-                if self._send_message(self.config["private_chat_id"], test_message + "\n\n👤 Mensagem de teste privada"):
+            private_chat_id = self.config.get("private_chat_id")
+            if private_chat_id:
+                if self._send_message(private_chat_id, test_message + "\n\n👤 Mensagem de teste privada"):
                     success_count += 1
                     self.logger.info("✅ Teste privado bem-sucedido")
             
@@ -297,4 +319,51 @@ class TelegramNotifier:
             
         except Exception as e:
             self.logger.error(f"❌ Erro no teste de notificação: {e}")
+            return False
+    
+    def notify_error(self, error_message: str, send_to_group: bool = False) -> bool:
+        """
+        Envia notificação de erro para o Telegram.
+        Por padrão, envia apenas para chat privado.
+        
+        Args:
+            error_message: Mensagem de erro
+            send_to_group: Se True, também envia para o grupo
+            
+        Returns:
+            bool: True se pelo menos uma notificação foi enviada com sucesso
+        """
+        import os
+        from datetime import datetime
+        
+        try:
+            timestamp = datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
+            environment = "GitHub Actions" if os.getenv('GITHUB_ACTIONS', 'false').lower() == 'true' else "Local"
+            
+            error_msg = f"🚨 *Erro no SIGAA Scraper*\n\n"
+            error_msg += f"❌ {error_message}\n\n"
+            error_msg += f"📍 Ambiente: {environment}\n"
+            error_msg += f"🕐 {timestamp}"
+            
+            success_count = 0
+            
+            # Sempre tenta enviar para chat privado em caso de erro
+            private_chat_id = self.config.get("private_chat_id")
+            if private_chat_id:
+                if self._send_message(private_chat_id, error_msg):
+                    success_count += 1
+                    self.logger.info("✅ Notificação de erro enviada para chat privado")
+            
+            # Opcionalmente envia para grupo se solicitado
+            if send_to_group:
+                group_chat_id = self.config.get("group_chat_id")
+                if group_chat_id:
+                    if self._send_message(group_chat_id, error_msg):
+                        success_count += 1
+                        self.logger.info("✅ Notificação de erro enviada para grupo")
+            
+            return success_count > 0
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao enviar notificação de erro: {e}")
             return False
