@@ -81,6 +81,7 @@ jobs:
           echo "TELEGRAM_GROUP_CHAT_ID=${{ secrets.TELEGRAM_GROUP_CHAT_ID }}" >> .env
           echo "TELEGRAM_PRIVATE_CHAT_ID=${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}" >> .env
           echo "EXTRACTION_METHOD=${{ secrets.EXTRACTION_METHOD }}" >> .env
+          echo "ENABLE_GITHUB_NOTIFICATIONS=${{ secrets.ENABLE_GITHUB_NOTIFICATIONS || 'false' }}" >> .env
 
       - name: Test configuration
         run: python main.py --test

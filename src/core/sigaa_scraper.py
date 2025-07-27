@@ -425,20 +425,23 @@ def main() -> None:
             for i, change in enumerate(changes, 1):
                 print(f"   {i}. {change}")
             
-            # No GitHub Actions, não envia notificações de mudanças normais
-            # Apenas logs e erros são notificados
+            # Verificar se deve enviar notificações
             import os
             is_github_actions = os.getenv('GITHUB_ACTIONS', 'false').lower() == 'true'
+            enable_github_notifications = os.getenv('ENABLE_GITHUB_NOTIFICATIONS', 'false').lower() == 'true'
             
-            if not is_github_actions:
+            # Enviar notificações se não estiver no GitHub Actions OU se explicitamente habilitado
+            if not is_github_actions or enable_github_notifications:
                 logger.info("📬 Enviando notificações...")
                 if scraper.notifier.notify_changes(changes):
                     print("📬 Notificações enviadas!")
                 else:
                     print("⚠️  Falha no envio de notificações")
             else:
-                logger.info("📬 Notificações de mudanças desabilitadas no GitHub Actions")
-                print("📬 Mudanças detectadas (notificações desabilitadas no GitHub Actions)")
+                if is_github_actions and not enable_github_notifications:
+                    logger.info("📬 Notificações de mudanças desabilitadas no GitHub Actions")
+                    print("📬 Mudanças detectadas (notificações desabilitadas no GitHub Actions)")
+                    print("💡 Para habilitar, defina ENABLE_GITHUB_NOTIFICATIONS=true")
         else:
             print("ℹ️  Nenhuma mudança detectada nas notas.")
         
