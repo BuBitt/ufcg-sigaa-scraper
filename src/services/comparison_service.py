@@ -241,6 +241,11 @@ class ComparisonService:
             # Verificar mudanças em campos importantes
             all_fields = set(old_record.keys()) | set(new_record.keys())
             
+            # Adicionar campos de unidades dinamicamente
+            for field in all_fields:
+                if field.startswith('Unidade.') or field == 'Final':
+                    important_fields.append(field)
+            
             for field in all_fields:
                 old_value = old_record.get(field, "")
                 new_value = new_record.get(field, "")
@@ -268,16 +273,29 @@ class ComparisonService:
             str: Descrição do novo registro
         """
         try:
-            # Tentar extrair nota
-            grade_value = record.get('_nota_extraida')
-            if grade_value is not None:
-                return f"{section_key}: Nova nota {grade_value}"
-            
-            # Procurar por campos de nota
-            grade_fields = ['Nota', 'Média', 'Resultado']
+            # Procurar por campos de nota principais
+            grade_fields = ['Resultado', 'Nota', 'Média']
             for field in grade_fields:
-                if field in record and record[field]:
+                if field in record and record[field] and record[field] != "--" and record[field].strip():
                     return f"{section_key}: {field} {record[field]}"
+            
+            # Se não encontrou resultado, procurar por unidades com notas
+            unit_notes = []
+            for field, value in record.items():
+                if field.startswith('Unidade.') and value and value.strip() and value != "--":
+                    unit_notes.append(f"{field}: {value}")
+            
+            if unit_notes:
+                # Mostrar apenas as primeiras unidades para não ficar muito longo
+                units_text = "; ".join(unit_notes[:2])
+                if len(unit_notes) > 2:
+                    units_text += f" (+ {len(unit_notes) - 2} mais)"
+                return f"{section_key}: {units_text}"
+            
+            # Tentar extrair nota do campo especial
+            grade_value = record.get('_nota_extraida')
+            if grade_value is not None and str(grade_value).strip() and str(grade_value) != "0":
+                return f"{section_key}: Nova nota {grade_value}"
             
             return f"{section_key}: Novo registro adicionado"
             

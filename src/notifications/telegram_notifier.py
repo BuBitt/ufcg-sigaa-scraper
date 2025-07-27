@@ -3,6 +3,8 @@ Notificador via Telegram para mudanças nas notas.
 """
 
 import requests
+import json
+import os
 from typing import List, Dict, Any, Optional
 
 from src.config.settings import Config
@@ -18,7 +20,46 @@ class TelegramNotifier:
         self.logger = get_logger("telegram")
         self.env_loader = get_env_loader()
         self.config = self.env_loader.get_telegram_config()
+        self.discipline_replacements = self._load_discipline_replacements()
         self.logger.debug("🔧 Notificador Telegram inicializado")
+    
+    def _load_discipline_replacements(self) -> Dict[str, str]:
+        """
+        Carrega o arquivo de substituições de disciplinas.
+        
+        Returns:
+            Dict[str, str]: Mapeamento de nome original para nome abreviado
+        """
+        try:
+            import json
+            import os
+            
+            replacements_file = os.path.join(os.getcwd(), "discipline_replacements.json")
+            
+            if os.path.exists(replacements_file):
+                with open(replacements_file, "r", encoding="utf-8") as f:
+                    replacements = json.load(f)
+                    self.logger.debug(f"📚 Carregadas {len(replacements)} substituições de disciplinas")
+                    return replacements
+            else:
+                self.logger.debug("📚 Arquivo de substituições não encontrado")
+                return {}
+                
+        except Exception as e:
+            self.logger.warning(f"⚠️  Erro ao carregar substituições de disciplinas: {e}")
+            return {}
+    
+    def _apply_discipline_replacement(self, discipline_name: str) -> str:
+        """
+        Aplica substituição de nome de disciplina se disponível.
+        
+        Args:
+            discipline_name: Nome original da disciplina
+            
+        Returns:
+            str: Nome substituído ou original se não há substituição
+        """
+        return self.discipline_replacements.get(discipline_name, discipline_name)
     
     def notify_changes(self, changes: List[str]) -> bool:
         """
@@ -135,6 +176,8 @@ class TelegramNotifier:
                 # Tentar extrair nome da disciplina da mudança
                 if ":" in change:
                     discipline = change.split(":")[0].strip()
+                    # Aplicar substituição se disponível
+                    discipline = self._apply_discipline_replacement(discipline)
                     disciplines.add(discipline)
                 else:
                     disciplines.add(change)
@@ -150,16 +193,14 @@ class TelegramNotifier:
             if len(disciplines) > max_show:
                 body += f"... e mais {len(disciplines) - max_show} disciplina(s)\n"
             
-            footer = f"\n📊 Total: {len(changes)} mudança(s) detectada(s)"
-            
-            return header + body + footer
+            return header + body
             
         except Exception:
-            return f"🎓 *Novas notas detectadas!*\n\n📊 {len(changes)} mudança(s) encontrada(s)"
+            return "🎓 *Novas notas detectadas!*"
     
     def _format_private_message(self, changes: List[str]) -> str:
         """
-        Formata mensagem para chat privado (detalhada).
+        Formata mensagem para chat privado (detalhada com notas).
         
         Args:
             changes: Lista de mudanças
@@ -172,17 +213,16 @@ class TelegramNotifier:
             
             body = ""
             for i, change in enumerate(changes, 1):
-                # Formatar cada mudança
-                formatted_change = self._format_change_detail(change)
+                # Formatar cada mudança com detalhes das notas
+                formatted_change = self._format_change_with_grades(change)
                 body += f"{i}. {formatted_change}\n"
             
-            footer = f"\n📊 Total: {len(changes)} mudança(s) detectada(s)"
-            footer += f"\n⏰ Verificação automática ativa"
+            footer = "\n⏰ Verificação automática ativa"
             
             return header + body + footer
             
         except Exception:
-            return f"🎓 *Notas atualizadas!*\n\n📊 {len(changes)} mudança(s) detectada(s)"
+            return "🎓 *Notas atualizadas!*"
     
     def _format_change_detail(self, change: str) -> str:
         """
@@ -207,12 +247,109 @@ class TelegramNotifier:
                 if len(parts) == 2:
                     discipline = parts[0].strip()
                     detail = parts[1].strip()
-                    return f"*{discipline}*: {detail}"
+                    # Aplicar substituição se disponível
+                    discipline_display = self._apply_discipline_replacement(discipline)
+                    return f"*{discipline_display}*: {detail}"
             
             return change
             
         except Exception:
             return change
+    
+    def _format_change_with_grades(self, change: str) -> str:
+        """
+        Formata mudanças incluindo detalhes das notas para mensagem privada.
+        
+        Args:
+            change: Descrição da mudança
+            
+        Returns:
+            str: Mudança formatada com notas
+        """
+        try:
+            # Destacar disciplinas (texto antes dos dois pontos)
+            if ":" in change:
+                parts = change.split(":", 1)
+                if len(parts) == 2:
+                    discipline = parts[0].strip()
+                    detail = parts[1].strip()
+                    
+                    # Aplicar substituição se disponível
+                    discipline_display = self._apply_discipline_replacement(discipline)
+                    
+                    # Verificar se contém informações de nota
+                    if "→" in detail:
+                        # Mudança de nota (antes → depois)
+                        formatted_detail = self._format_grade_change(detail)
+                        return f"*{discipline_display}*: {formatted_detail}"
+                    elif "Nova nota" in detail or "Nota" in detail or "Resultado" in detail:
+                        # Nova nota ou resultado
+                        formatted_detail = self._highlight_grades_in_text(detail)
+                        return f"*{discipline_display}*: {formatted_detail}"
+                    else:
+                        # Outras mudanças
+                        return f"*{discipline_display}*: {detail}"
+            
+            # Se não há dois pontos, verificar se contém números (notas)
+            if any(char.isdigit() for char in change):
+                return self._highlight_grades_in_text(change)
+            
+            return change
+            
+        except Exception:
+            return change
+    
+    def _format_grade_change(self, detail: str) -> str:
+        """
+        Formata mudanças de nota (antes → depois).
+        
+        Args:
+            detail: Detalhe da mudança
+            
+        Returns:
+            str: Mudança formatada
+        """
+        try:
+            import re
+            # Procurar padrão "valor → valor"
+            arrow_pattern = r'([^→]+)→([^→]+)'
+            match = re.search(arrow_pattern, detail)
+            
+            if match:
+                before = match.group(1).strip()
+                after = match.group(2).strip()
+                
+                # Destacar os valores
+                before_highlighted = self._highlight_grades_in_text(before)
+                after_highlighted = self._highlight_grades_in_text(after)
+                
+                return f"{before_highlighted} → *{after_highlighted}*"
+            
+            return detail
+            
+        except Exception:
+            return detail
+    
+    def _highlight_grades_in_text(self, text: str) -> str:
+        """
+        Destaca valores numéricos (notas) no texto.
+        
+        Args:
+            text: Texto a ser processado
+            
+        Returns:
+            str: Texto com notas destacadas
+        """
+        try:
+            import re
+            # Destacar números (possíveis notas)
+            # Padrão para números com vírgula ou ponto decimal
+            grade_pattern = r'(\d+[.,]?\d*)'
+            highlighted = re.sub(grade_pattern, r'*\1*', text)
+            return highlighted
+            
+        except Exception:
+            return text
     
     def _send_message(self, chat_id: str, message: str) -> bool:
         """
