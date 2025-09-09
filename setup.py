@@ -25,9 +25,9 @@ def check_environment() -> Dict[str, Any]:
     # Verificar arquivo .env
     if os.path.exists(".env"):
         status["env_file"] = True
-        print("✅ Arquivo .env encontrado")
+        print("Arquivo .env encontrado")
     else:
-        print("❌ Arquivo .env não encontrado")
+        print("Arquivo .env não encontrado")
         return status
     
     # Verificar credenciais
@@ -37,51 +37,51 @@ def check_environment() -> Dict[str, Any]:
         username, password = env_loader.get_credentials()
         if username and password:
             status["credentials"] = True
-            print(f"✅ Credenciais configuradas para usuário: {username[:3]}***")
+            print(f"Credenciais configuradas para usuário: {username[:3]}***")
         else:
-            print("❌ Credenciais não configuradas")
+            print("Credenciais não configuradas")
     except Exception as e:
-        print(f"❌ Erro ao carregar credenciais: {e}")
+        print(f"Erro ao carregar credenciais: {e}")
     
     # Verificar configuração do Telegram
     try:
         telegram_config = env_loader.get_telegram_config()
         if telegram_config.get("bot_token"):
             status["telegram"] = True
-            print("✅ Bot Telegram configurado")
+            print("Bot Telegram configurado")
         else:
-            print("⚠️  Bot Telegram não configurado (opcional)")
+            print("Bot Telegram não configurado (opcional)")
     except Exception as e:
-        print(f"⚠️  Telegram não configurado: {e}")
+        print(f"Telegram não configurado: {e}")
     
     # Verificar dependências
     try:
-        import playwright
-        import beautifulsoup4
-        import requests
+        import playwright  # type: ignore
+        import bs4  # beautifulsoup4
+        import requests  # type: ignore
         status["dependencies"] = True
-        print("✅ Dependências instaladas")
+        print("Dependências instaladas")
     except ImportError as e:
-        print(f"❌ Dependência faltando: {e}")
+        print(f"Dependência faltando: {e}")
     
     # Verificar diretórios
     if os.path.exists("logs"):
         status["directories"] = True
-        print("✅ Diretórios criados")
+        print("Diretórios criados")
     else:
         os.makedirs("logs", exist_ok=True)
         status["directories"] = True
-        print("✅ Diretórios criados")
+        print("Diretórios criados")
     
     return status
 
 def setup_environment():
     """Configura o ambiente inicial."""
-    print("🔧 Configurando ambiente...")
+    print("Configurando ambiente...")
     
     # Criar arquivo .env se não existir
     if not os.path.exists(".env"):
-        print("📝 Criando arquivo .env...")
+        print("Criando arquivo .env...")
         env_template = """# UFCG SIGAA Scraper - Configurações de Ambiente
 
 # ====================================================================
@@ -105,16 +105,16 @@ TELEGRAM_PRIVATE_CHAT_ID=
 """
         with open(".env", "w") as f:
             f.write(env_template)
-        print("✅ Arquivo .env criado")
-        print("📝 Edite o arquivo .env com suas credenciais")
+        print("Arquivo .env criado")
+        print("Edite o arquivo .env com suas credenciais")
     
     # Criar diretórios necessários
     os.makedirs("logs", exist_ok=True)
-    print("✅ Diretórios criados")
+    print("Diretórios criados")
 
 def test_login():
     """Testa apenas o login sem extrair notas."""
-    print("🧪 Testando login...")
+    print("Testando login...")
     
     try:
         from src.services.auth_service import AuthService
@@ -133,20 +133,20 @@ def test_login():
             success = auth_service.login(page)
             
             if success:
-                print("✅ Login realizado com sucesso!")
+                print("Login realizado com sucesso.")
                 input("Pressione Enter para fechar o navegador...")
             else:
-                print("❌ Falha no login")
+                print("Falha no login")
             
             browser.close()
             
     except Exception as e:
-        print(f"❌ Erro no teste: {e}")
+        print(f"Erro no teste: {e}")
 
 def main():
     """Função principal do script de configuração."""
     if len(sys.argv) < 2:
-        print("🔧 SIGAA Scraper - Script de Configuração")
+        print("SIGAA Scraper - Script de Configuração")
         print("\nComandos disponíveis:")
         print("  setup    - Configurar ambiente inicial")
         print("  check    - Verificar configurações")
@@ -161,13 +161,13 @@ def main():
     elif command == "check":
         status = check_environment()
         
-        print("\n📊 RESUMO:")
+        print("\nRESUMO:")
         all_good = all(status.values())
         if all_good:
-            print("🎉 Tudo configurado corretamente!")
-            print("💡 Execute: python main.py")
+            print("Tudo configurado corretamente.")
+            print("Execute: python main.py")
         else:
-            print("⚠️  Algumas configurações precisam de atenção")
+            print("Algumas configurações precisam de atenção")
             if not status["credentials"]:
                 print("   - Configure suas credenciais no arquivo .env")
             if not status["dependencies"]:
@@ -178,14 +178,14 @@ def main():
         if status["credentials"]:
             test_login()
         else:
-            print("❌ Configure suas credenciais primeiro")
+            print("Configure suas credenciais primeiro")
     
     elif command == "run":
         from main import main as run_scraper
         run_scraper()
     
     else:
-        print(f"❌ Comando desconhecido: {command}")
+        print(f"Comando desconhecido: {command}")
 
 if __name__ == "__main__":
     main()

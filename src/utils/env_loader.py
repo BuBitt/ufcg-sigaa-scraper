@@ -40,7 +40,7 @@ class EnvLoader:
             try:
                 load_dotenv(local_env_path)
                 self._loaded = True
-                self.logger.info(f"✅ Variáveis carregadas de .env.local")
+                self.logger.info("Variáveis carregadas de .env.local")
                 return True
             except Exception as e:
                 self.logger.error(f"Erro ao carregar .env.local: {e}")
@@ -55,7 +55,7 @@ class EnvLoader:
         try:
             load_dotenv(env_path)
             self._loaded = True
-            self.logger.info(f"✅ Variáveis carregadas de {env_file}")
+            self.logger.info(f"Variáveis carregadas de {env_file}")
             return True
         except Exception as e:
             self.logger.error(f"Erro ao carregar {env_file}: {e}")

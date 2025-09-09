@@ -21,7 +21,7 @@ class TelegramNotifier:
         self.env_loader = get_env_loader()
         self.config = self.env_loader.get_telegram_config()
         self.discipline_replacements = self._load_discipline_replacements()
-        self.logger.debug("🔧 Notificador Telegram inicializado")
+        self.logger.debug("Notificador Telegram inicializado")
     
     def _load_discipline_replacements(self) -> Dict[str, str]:
         """
@@ -39,14 +39,14 @@ class TelegramNotifier:
             if os.path.exists(replacements_file):
                 with open(replacements_file, "r", encoding="utf-8") as f:
                     replacements = json.load(f)
-                    self.logger.debug(f"📚 Carregadas {len(replacements)} substituições de disciplinas")
+                    self.logger.debug(f"Carregadas {len(replacements)} substituições de disciplinas")
                     return replacements
             else:
-                self.logger.debug("📚 Arquivo de substituições não encontrado")
+                self.logger.debug("Arquivo de substituições não encontrado")
                 return {}
                 
         except Exception as e:
-            self.logger.warning(f"⚠️  Erro ao carregar substituições de disciplinas: {e}")
+            self.logger.warning(f"Erro ao carregar substituições de disciplinas: {e}")
             return {}
     
     def _apply_discipline_replacement(self, discipline_name: str) -> str:
@@ -91,14 +91,14 @@ class TelegramNotifier:
                     success_count += 1
             
             if success_count > 0:
-                self.logger.info(f"✅ {success_count} notificação(ões) enviada(s) com sucesso")
+                self.logger.info(f"{success_count} notificação(ões) enviada(s) com sucesso")
                 return True
             else:
-                self.logger.warning("⚠️  Nenhuma notificação foi enviada")
+                self.logger.warning("Nenhuma notificação foi enviada")
                 return False
                 
         except Exception as e:
-            self.logger.error(f"❌ Erro ao enviar notificações: {e}", exc_info=True)
+            self.logger.error(f"Erro ao enviar notificações: {e}", exc_info=True)
             return False
     
     def _send_group_notification(self, changes: List[str]) -> bool:
@@ -119,14 +119,14 @@ class TelegramNotifier:
             success = self._send_message(chat_id, message)
             
             if success:
-                self.logger.info("📢 Notificação de grupo enviada")
+                self.logger.info("Notificação de grupo enviada")
             else:
-                self.logger.error("❌ Falha ao enviar notificação de grupo")
+                self.logger.error("Falha ao enviar notificação de grupo")
             
             return success
             
         except Exception as e:
-            self.logger.error(f"❌ Erro ao enviar notificação de grupo: {e}")
+            self.logger.error(f"Erro ao enviar notificação de grupo: {e}")
             return False
     
     def _send_private_notification(self, changes: List[str]) -> bool:
@@ -147,14 +147,14 @@ class TelegramNotifier:
             success = self._send_message(chat_id, message)
             
             if success:
-                self.logger.info("👤 Notificação privada enviada")
+                self.logger.info("Notificação privada enviada")
             else:
-                self.logger.error("❌ Falha ao enviar notificação privada")
+                self.logger.error("Falha ao enviar notificação privada")
             
             return success
             
         except Exception as e:
-            self.logger.error(f"❌ Erro ao enviar notificação privada: {e}")
+            self.logger.error(f"Erro ao enviar notificação privada: {e}")
             return False
     
     def _format_group_message(self, changes: List[str]) -> str:
@@ -365,11 +365,11 @@ class TelegramNotifier:
         try:
             bot_token = self.config.get("bot_token")
             if not bot_token:
-                self.logger.warning("⚠️  Token do bot não configurado")
+                self.logger.warning("Token do bot não configurado")
                 return False
             
             if not chat_id:
-                self.logger.warning("⚠️  Chat ID não configurado")
+                self.logger.warning("Chat ID não configurado")
                 return False
             
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -390,20 +390,20 @@ class TelegramNotifier:
             )
             
             if response.status_code == 200:
-                self.logger.debug("✅ Mensagem enviada com sucesso")
+                self.logger.debug("Mensagem enviada com sucesso")
                 return True
             else:
-                self.logger.error(f"❌ Erro HTTP {response.status_code}: {response.text}")
+                self.logger.error(f"Erro HTTP {response.status_code}: {response.text}")
                 return False
                 
         except requests.exceptions.Timeout:
-            self.logger.error("❌ Timeout ao enviar mensagem")
+            self.logger.error("Timeout ao enviar mensagem")
             return False
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"❌ Erro de rede: {e}")
+            self.logger.error(f"Erro de rede: {e}")
             return False
         except Exception as e:
-            self.logger.error(f"❌ Erro inesperado ao enviar mensagem: {e}")
+            self.logger.error(f"Erro inesperado ao enviar mensagem: {e}")
             return False
     
     def test_notification(self) -> bool:
@@ -426,36 +426,36 @@ class TelegramNotifier:
                 (self.config.get("group_chat_id") or self.config.get("private_chat_id"))
             )
             if has_config:
-                self.logger.info("✅ Configuração do Telegram validada (GitHub Actions - sem envio de teste)")
+                self.logger.info("Configuração do Telegram validada (GitHub Actions - sem envio de teste)")
                 return True
             else:
-                self.logger.warning("⚠️  Configuração do Telegram incompleta")
+                self.logger.warning("Configuração do Telegram incompleta")
                 return False
         
         # Em ambiente local, envia mensagem de teste normalmente
         try:
-            test_message = "🔧 *Teste de Conectividade*\n\nSIGAA Scraper funcionando corretamente!"
+            test_message = "Teste de Conectividade\n\nSIGAA Scraper funcionando corretamente!"
             
             success_count = 0
             
             # Testar grupo
             group_chat_id = self.config.get("group_chat_id")
             if group_chat_id:
-                if self._send_message(group_chat_id, test_message + "\n\n📢 Mensagem de teste para o grupo"):
+                if self._send_message(group_chat_id, test_message + "\n\nMensagem de teste para o grupo"):
                     success_count += 1
-                    self.logger.info("✅ Teste de grupo bem-sucedido")
+                    self.logger.info("Teste de grupo bem-sucedido")
             
             # Testar privado
             private_chat_id = self.config.get("private_chat_id")
             if private_chat_id:
-                if self._send_message(private_chat_id, test_message + "\n\n👤 Mensagem de teste privada"):
+                if self._send_message(private_chat_id, test_message + "\n\nMensagem de teste privada"):
                     success_count += 1
-                    self.logger.info("✅ Teste privado bem-sucedido")
+                    self.logger.info("Teste privado bem-sucedido")
             
             return success_count > 0
             
         except Exception as e:
-            self.logger.error(f"❌ Erro no teste de notificação: {e}")
+            self.logger.error(f"Erro no teste de notificação: {e}")
             return False
     
     def notify_error(self, error_message: str, send_to_group: bool = False) -> bool:
@@ -477,10 +477,10 @@ class TelegramNotifier:
             timestamp = datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
             environment = "GitHub Actions" if os.getenv('GITHUB_ACTIONS', 'false').lower() == 'true' else "Local"
             
-            error_msg = f"🚨 *Erro no SIGAA Scraper*\n\n"
-            error_msg += f"❌ {error_message}\n\n"
-            error_msg += f"📍 Ambiente: {environment}\n"
-            error_msg += f"🕐 {timestamp}"
+            error_msg = f"Erro no SIGAA Scraper\n\n"
+            error_msg += f"Erro: {error_message}\n\n"
+            error_msg += f"Ambiente: {environment}\n"
+            error_msg += f"Horário: {timestamp}"
             
             success_count = 0
             
@@ -489,7 +489,7 @@ class TelegramNotifier:
             if private_chat_id:
                 if self._send_message(private_chat_id, error_msg):
                     success_count += 1
-                    self.logger.info("✅ Notificação de erro enviada para chat privado")
+                    self.logger.info("Notificação de erro enviada para chat privado")
             
             # Opcionalmente envia para grupo se solicitado
             if send_to_group:
@@ -497,10 +497,10 @@ class TelegramNotifier:
                 if group_chat_id:
                     if self._send_message(group_chat_id, error_msg):
                         success_count += 1
-                        self.logger.info("✅ Notificação de erro enviada para grupo")
+                        self.logger.info("Notificação de erro enviada para grupo")
             
             return success_count > 0
             
         except Exception as e:
-            self.logger.error(f"❌ Erro ao enviar notificação de erro: {e}")
+            self.logger.error(f"Erro ao enviar notificação de erro: {e}")
             return False

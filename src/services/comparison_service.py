@@ -14,7 +14,7 @@ class ComparisonService:
     def __init__(self) -> None:
         """Inicializa o serviço de comparação."""
         self.logger = get_logger("comparison")
-        self.logger.debug("🔧 Serviço de comparação inicializado")
+        self.logger.debug("Serviço de comparação inicializado")
     
     def compare_grades(self, old_grades: Dict[str, Any], new_grades: Dict[str, Any]) -> List[str]:
         """
@@ -28,13 +28,13 @@ class ComparisonService:
             List[str]: Lista de mudanças detectadas
         """
         try:
-            self.logger.info("🔍 Iniciando comparação de notas")
+            self.logger.info("Iniciando comparação de notas")
             
             changes = []
             
             # Se não há notas antigas, tudo é novo
             if not old_grades:
-                self.logger.info("📝 Primeira execução - todas as notas são novas")
+                self.logger.info("Primeira execução - todas as notas são novas")
                 changes.extend(self._format_all_as_new(new_grades))
                 return changes
             
@@ -52,11 +52,11 @@ class ComparisonService:
                 key_changes = self._compare_grade_section(key, old_data, new_data)
                 changes.extend(key_changes)
             
-            self.logger.info(f"🔍 Comparação concluída: {len(changes)} mudança(s) detectada(s)")
+            self.logger.info(f"Comparação concluída: {len(changes)} mudança(s) detectada(s)")
             return changes
             
         except Exception as e:
-            self.logger.error(f"❌ Erro na comparação de notas: {e}", exc_info=True)
+            self.logger.error(f"Erro na comparação de notas: {e}", exc_info=True)
             return []
     
     def _normalize_grades_structure(self, grades: Any) -> Dict[str, List[Dict[str, Any]]]:
@@ -101,7 +101,7 @@ class ComparisonService:
                 return {"Dados_Desconhecidos": [{"value": str(grades)}]}
                 
         except Exception as e:
-            self.logger.warning(f"⚠️  Erro na normalização: {e}")
+            self.logger.warning(f"Erro na normalização: {e}")
             return {}
     
     def _extract_key_from_record(self, record: Dict[str, Any], index: int) -> str:
@@ -180,7 +180,7 @@ class ComparisonService:
                     changes.append(change_desc)
             
         except Exception as e:
-            self.logger.warning(f"⚠️  Erro ao comparar seção {section_key}: {e}")
+            self.logger.warning(f"Erro ao comparar seção {section_key}: {e}")
         
         return changes
     
@@ -324,5 +324,5 @@ class ComparisonService:
             return changes
             
         except Exception as e:
-            self.logger.warning(f"⚠️  Erro ao formatar como novos: {e}")
+            self.logger.warning(f"Erro ao formatar como novos: {e}")
             return ["Novas notas detectadas"]

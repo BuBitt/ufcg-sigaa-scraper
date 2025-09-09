@@ -20,7 +20,7 @@ class AuthService:
         """Inicializa o serviço de autenticação."""
         self.logger = get_logger("auth")
         self.env_loader = get_env_loader()
-        self.logger.debug("🔧 Serviço de autenticação inicializado")
+        self.logger.debug("Serviço de autenticação inicializado")
     
     def _mask_credential(self, credential: str) -> str:
         """
@@ -56,10 +56,10 @@ class AuthService:
             username, password = self.env_loader.validate_credentials()
             masked_username = self._mask_credential(username)
             
-            self.logger.info(f"🔐 Iniciando login no SIGAA para usuário {masked_username}")
+            self.logger.info(f"Iniciando login no SIGAA para usuário {masked_username}")
             
             # Navegar para página de login
-            self.logger.debug("🌐 Navegando para página do SIGAA")
+            self.logger.debug("Navegando para página do SIGAA")
             page.goto(Config.SIGAA_URL)
             
             # Aguardar carregamento da página
@@ -67,11 +67,11 @@ class AuthService:
             
             # Verificar se já está logado
             if self._is_already_logged_in(page):
-                self.logger.info("✅ Usuário já está logado")
+                self.logger.info("Usuário já está logado")
                 return True
             
             # Preencher formulário de login
-            self.logger.debug("📝 Preenchendo formulário de login")
+            self.logger.debug("Preenchendo formulário de login")
             
             # Aguardar campos de login
             page.wait_for_selector("input[name='user.login']", timeout=10000)
@@ -85,7 +85,7 @@ class AuthService:
             self._debug_page_elements(page)
             
             # Clicar no botão de login - tentar diferentes seletores
-            self.logger.debug("🚀 Submetendo formulário de login")
+            self.logger.debug("Submetendo formulário de login")
             login_button_found = False
             
             # Lista de seletores possíveis para o botão de login
@@ -101,17 +101,17 @@ class AuthService:
             for selector in login_selectors:
                 try:
                     if page.locator(selector).count() > 0:
-                        self.logger.debug(f"🎯 Botão encontrado com seletor: {selector}")
+                        self.logger.debug(f"Botão encontrado com seletor: {selector}")
                         page.click(selector)
                         login_button_found = True
                         break
                 except Exception as e:
-                    self.logger.debug(f"⚠️  Seletor {selector} não funcionou: {e}")
+                    self.logger.debug(f"Seletor {selector} não funcionou: {e}")
                     continue
             
             if not login_button_found:
                 # Tentar submeter o formulário diretamente
-                self.logger.debug("🔄 Tentando submeter formulário diretamente")
+                self.logger.debug("Tentando submeter formulário diretamente")
                 page.press("input[name='user.senha']", "Enter")
             
             # Aguardar redirecionamento
@@ -119,14 +119,14 @@ class AuthService:
             
             # Verificar sucesso do login
             if self._verify_login_success(page):
-                self.logger.info("✅ Login realizado com sucesso")
+                self.logger.info("Login realizado com sucesso")
                 return True
             else:
-                self.logger.error("❌ Falha na autenticação - credenciais inválidas")
+                self.logger.error("Falha na autenticação - credenciais inválidas")
                 return False
                 
         except Exception as e:
-            self.logger.error(f"❌ Erro durante o login: {e}", exc_info=True)
+            self.logger.error(f"Erro durante o login: {e}", exc_info=True)
             return False
     
     def _is_already_logged_in(self, page: Page) -> bool:
@@ -180,14 +180,14 @@ class AuthService:
             for indicator in success_indicators:
                 try:
                     page.wait_for_selector(indicator, timeout=5000)
-                    self.logger.debug(f"✅ Indicador de sucesso encontrado: {indicator}")
+                    self.logger.debug(f"Indicador de sucesso encontrado: {indicator}")
                     return True
                 except:
                     continue
             
             # Verificar se ainda está na página de login (falha)
             if page.locator("input[name='user.login']").count() > 0:
-                self.logger.error("❌ Ainda na página de login - credenciais incorretas")
+                self.logger.error("Ainda na página de login - credenciais incorretas")
                 return False
             
             # Verificar mensagens de erro
@@ -200,15 +200,15 @@ class AuthService:
             for error_selector in error_selectors:
                 if page.locator(error_selector).count() > 0:
                     error_text = page.locator(error_selector).first.text_content()
-                    self.logger.error(f"❌ Erro de login detectado: {error_text}")
+                    self.logger.error(f"Erro de login detectado: {error_text}")
                     return False
             
             # Se chegou até aqui, assumir sucesso
-            self.logger.debug("✅ Login parece ter sido bem-sucedido")
+            self.logger.debug("Login parece ter sido bem-sucedido")
             return True
             
         except Exception as e:
-            self.logger.warning(f"⚠️  Erro na verificação de login: {e}")
+            self.logger.warning(f"Erro na verificação de login: {e}")
             return False
     
     def _debug_page_elements(self, page: Page) -> None:
@@ -219,15 +219,15 @@ class AuthService:
             page: Página do navegador
         """
         try:
-            self.logger.debug("🔍 Inspecionando elementos da página...")
+            self.logger.debug("Inspecionando elementos da página...")
             
             # Verificar se está na página de login
             url = page.url
-            self.logger.debug(f"📍 URL atual: {url}")
+            self.logger.debug(f"URL atual: {url}")
             
             # Listar todos os inputs type=submit
             submit_buttons = page.locator("input[type='submit']").all()
-            self.logger.debug(f"🔘 Botões submit encontrados: {len(submit_buttons)}")
+            self.logger.debug(f"Botoes submit encontrados: {len(submit_buttons)}")
             
             for i, button in enumerate(submit_buttons):
                 try:
@@ -239,12 +239,12 @@ class AuthService:
             
             # Verificar formulários
             forms = page.locator("form").all()
-            self.logger.debug(f"📝 Formulários encontrados: {len(forms)}")
+            self.logger.debug(f"Formulários encontrados: {len(forms)}")
             
             # Verificar campos de login
             login_field = page.locator("input[name='user.login']").count()
             password_field = page.locator("input[name='user.senha']").count()
-            self.logger.debug(f"🔑 Campo login: {login_field}, Campo senha: {password_field}")
+            self.logger.debug(f"Campo login: {login_field}, Campo senha: {password_field}")
             
         except Exception as e:
-            self.logger.debug(f"⚠️  Erro no debug: {e}")
+            self.logger.debug(f"Erro no debug: {e}")

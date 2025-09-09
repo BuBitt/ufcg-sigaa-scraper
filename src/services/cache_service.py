@@ -18,7 +18,7 @@ class CacheService:
         """Inicializa o serviço de cache."""
         self.logger = get_logger("cache")
         self.cache_file = Config.CACHE_FILENAME
-        self.logger.debug("🔧 Serviço de cache inicializado")
+        self.logger.debug("Serviço de cache inicializado")
     
     def load_cache(self) -> Dict[str, Any]:
         """
@@ -29,7 +29,7 @@ class CacheService:
         """
         try:
             if not os.path.exists(self.cache_file):
-                self.logger.info("📂 Arquivo de cache não existe, criando novo")
+                self.logger.info("Arquivo de cache não existe, criando novo")
                 return {}
             
             with open(self.cache_file, 'r', encoding=Config.DEFAULT_ENCODING) as f:
@@ -38,18 +38,18 @@ class CacheService:
             # Verificar estrutura do cache
             if 'metadata' in data:
                 last_update = data['metadata'].get('last_update', 'desconhecido')
-                self.logger.info(f"📂 Cache carregado - última atualização: {last_update}")
+                self.logger.info(f"Cache carregado - última atualização: {last_update}")
             else:
-                self.logger.info("📂 Cache carregado (formato antigo)")
+                self.logger.info("Cache carregado (formato antigo)")
             
             return data.get('grades', data)  # Suporte a formato antigo
             
         except json.JSONDecodeError as e:
-            self.logger.error(f"❌ Erro ao decodificar JSON do cache: {e}")
+            self.logger.error(f"Erro ao decodificar JSON do cache: {e}")
             self._backup_corrupted_cache()
             return {}
         except Exception as e:
-            self.logger.error(f"❌ Erro ao carregar cache: {e}")
+            self.logger.error(f"Erro ao carregar cache: {e}")
             return {}
     
     def save_cache(self, grades: List[Dict[str, Any]]) -> bool:
@@ -82,11 +82,11 @@ class CacheService:
             with open(self.cache_file, 'w', encoding=Config.DEFAULT_ENCODING) as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=Config.JSON_INDENT)
             
-            self.logger.info(f"💾 Cache salvo: {len(grades)} registro(s)")
+            self.logger.info(f"Cache salvo: {len(grades)} registro(s)")
             return True
             
         except Exception as e:
-            self.logger.error(f"❌ Erro ao salvar cache: {e}")
+            self.logger.error(f"Erro ao salvar cache: {e}")
             return False
     
     def _create_backup(self) -> None:
@@ -111,19 +111,19 @@ class CacheService:
             # Criar novo backup
             import shutil
             shutil.copy2(self.cache_file, backup_file)
-            self.logger.debug("🔄 Backup do cache criado")
+            self.logger.debug("Backup do cache criado")
             
         except Exception as e:
-            self.logger.warning(f"⚠️  Erro ao criar backup: {e}")
+            self.logger.warning(f"Erro ao criar backup: {e}")
     
     def _backup_corrupted_cache(self) -> None:
         """Faz backup de cache corrompido."""
         try:
             corrupted_file = f"{self.cache_file}.corrupted.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             os.rename(self.cache_file, corrupted_file)
-            self.logger.warning(f"⚠️  Cache corrompido movido para: {corrupted_file}")
+            self.logger.warning(f"Cache corrompido movido para: {corrupted_file}")
         except Exception as e:
-            self.logger.error(f"❌ Erro ao fazer backup de cache corrompido: {e}")
+            self.logger.error(f"Erro ao fazer backup de cache corrompido: {e}")
     
     def get_cache_info(self) -> Dict[str, Any]:
         """
@@ -152,7 +152,7 @@ class CacheService:
                     info['metadata'] = data.get('metadata', {})
             
         except Exception as e:
-            self.logger.warning(f"⚠️  Erro ao obter informações do cache: {e}")
+            self.logger.warning(f"Erro ao obter informações do cache: {e}")
         
         return info
     
@@ -173,7 +173,7 @@ class CacheService:
                 return True
                 
         except Exception as e:
-            self.logger.error(f"❌ Erro ao remover cache: {e}")
+            self.logger.error(f"Erro ao remover cache: {e}")
             return False
     
     def validate_cache_integrity(self) -> bool:
@@ -188,7 +188,7 @@ class CacheService:
             
             # Verificações básicas
             if not isinstance(data, (dict, list)):
-                self.logger.warning("⚠️  Cache não é dict nem list")
+                self.logger.warning("Cache não é dict nem list")
                 return False
             
             # Se é dict, verificar se tem estrutura esperada
@@ -200,12 +200,12 @@ class CacheService:
                     grades = data
                 
                 if not isinstance(grades, (dict, list)):
-                    self.logger.warning("⚠️  Estrutura de notas inválida no cache")
+                    self.logger.warning("Estrutura de notas inválida no cache")
                     return False
             
-            self.logger.debug("✅ Cache válido")
+            self.logger.debug("Cache válido")
             return True
             
         except Exception as e:
-            self.logger.error(f"❌ Erro na validação do cache: {e}")
+            self.logger.error(f"Erro na validação do cache: {e}")
             return False
