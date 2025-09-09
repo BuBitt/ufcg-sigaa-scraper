@@ -32,7 +32,7 @@ class PerformanceLogger:
             operation: Nome da operação sendo medida
         """
         self.timers[operation] = time.time()
-        self.logger.debug(f"⏱️  Timer iniciado: {operation}")
+    self.logger.debug(f"Timer iniciado: {operation}")
     
     def end_timer(self, operation: str) -> float:
         """
@@ -45,13 +45,13 @@ class PerformanceLogger:
             float: Tempo decorrido em segundos
         """
         if operation not in self.timers:
-            self.logger.warning(f"⚠️  Timer não encontrado: {operation}")
+            self.logger.warning(f"Timer não encontrado: {operation}")
             return 0.0
         
         elapsed = time.time() - self.timers[operation]
         del self.timers[operation]
         
-        self.logger.info(f"⏱️  {operation}: {elapsed:.2f}s")
+    self.logger.info(f"{operation}: {elapsed:.2f}s")
         return elapsed
 
 
@@ -133,11 +133,11 @@ def log_system_info() -> None:
     """Registra informações do sistema para debug."""
     logger = get_logger("system")
     
-    logger.debug("📊 Informações do Sistema:")
-    logger.debug(f"   🐍 Python: {sys.version}")
-    logger.debug(f"   💻 OS: {platform.system()} {platform.release()}")
-    logger.debug(f"   🏗️  Arquitetura: {platform.machine()}")
-    logger.debug(f"   📁 Diretório: {os.getcwd()}")
+    logger.debug("Informações do Sistema:")
+    logger.debug(f"   Python: {sys.version}")
+    logger.debug(f"   OS: {platform.system()} {platform.release()}")
+    logger.debug(f"   Arquitetura: {platform.machine()}")
+    logger.debug(f"   Diretório: {os.getcwd()}")
 
 
 def log_environment_vars() -> None:
@@ -150,7 +150,7 @@ def log_environment_vars() -> None:
         "HEADLESS", "DEBUG"
     ]
     
-    logger.debug("🔧 Variáveis de Ambiente:")
+    logger.debug("Variáveis de Ambiente:")
     for var in env_vars:
         value = os.getenv(var, "não definida")
         logger.debug(f"   {var}: {value}")
