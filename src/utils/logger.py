@@ -48,11 +48,10 @@ class PerformanceLogger:
             self.logger.warning(f"Timer não encontrado: {operation}")
             return 0.0
         
-        elapsed = time.time() - self.timers[operation]
-        del self.timers[operation]
-        
+    elapsed = time.time() - self.timers[operation]
+    del self.timers[operation]
     self.logger.info(f"{operation}: {elapsed:.2f}s")
-        return elapsed
+    return elapsed
 
 
 def setup_logger(enable_debug: bool = False) -> None:
