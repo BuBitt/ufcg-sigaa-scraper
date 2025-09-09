@@ -19,7 +19,7 @@ class GradeExtractor:
     def __init__(self) -> None:
         """Inicializa o extrator de notas."""
         self.logger = get_logger("grade_extractor")
-        self.logger.debug("🔧 Extrator de notas inicializado")
+        self.logger.debug("Extrator de notas inicializado")
     
     def extract_from_page_direct(self, page: Page) -> Dict[str, Any]:
         """
@@ -32,7 +32,7 @@ class GradeExtractor:
             Dict[str, Any]: Notas extraídas organizadas
         """
         try:
-            self.logger.info("📊 Extraindo notas da página atual")
+            self.logger.info("Extraindo notas da página atual")
             
             # Obter conteúdo HTML
             content = page.content()
@@ -43,11 +43,11 @@ class GradeExtractor:
             # Organizar por semestre/período
             organized = self.organize_grades_by_semester(grades)
             
-            self.logger.info(f"✅ Extração concluída: {len(grades)} registro(s)")
+            self.logger.info(f"Extração concluída: {len(grades)} registro(s)")
             return organized
             
         except Exception as e:
-            self.logger.error(f"❌ Erro na extração direta: {e}", exc_info=True)
+            self.logger.error(f"Erro na extração direta: {e}", exc_info=True)
             return {}
     
     def extract_grades(self, page_content: str) -> List[Dict[str, Any]]:
@@ -61,28 +61,28 @@ class GradeExtractor:
             List[Dict[str, Any]]: Lista de registros de notas extraídos
         """
         try:
-            self.logger.info("📊 Iniciando extração de notas do HTML")
+            self.logger.info("Iniciando extração de notas do HTML")
             soup = BeautifulSoup(page_content, 'html.parser')
             
             # Encontrar todas as tabelas de notas
             tables = soup.find_all('table', class_='tabelaRelatorio')
             all_grades = []
             
-            self.logger.info(f"🔍 Encontradas {len(tables)} tabela(s) para processamento")
+            self.logger.info(f"Encontradas {len(tables)} tabela(s) para processamento")
             
             for i, table in enumerate(tables):
                 try:
                     table_grades = self._extract_table_grades(table, i)
                     all_grades.extend(table_grades)
                 except Exception as e:
-                    self.logger.warning(f"⚠️  Erro ao processar tabela {i+1}: {e}")
+                    self.logger.warning(f"Erro ao processar tabela {i+1}: {e}")
                     continue
             
-            self.logger.info(f"📊 Total de registros extraídos: {len(all_grades)}")
+            self.logger.info(f"Total de registros extraídos: {len(all_grades)}")
             return all_grades
             
         except Exception as e:
-            self.logger.error(f"❌ Erro na extração de notas: {e}", exc_info=True)
+            self.logger.error(f"Erro na extração de notas: {e}", exc_info=True)
             return []
     
     def _extract_table_grades(self, table, table_index: int) -> List[Dict[str, Any]]:
@@ -143,13 +143,13 @@ class GradeExtractor:
                     grades.append(record)
                     
                 except Exception as e:
-                    self.logger.warning(f"⚠️  Erro ao processar linha {row_index+1}: {e}")
+                    self.logger.warning(f"Erro ao processar linha {row_index+1}: {e}")
                     continue
             
-            self.logger.debug(f"✅ Tabela {table_index+1}: {len(grades)} registro(s) extraídos")
+            self.logger.debug(f"Tabela {table_index+1}: {len(grades)} registro(s) extraídos")
             
         except Exception as e:
-            self.logger.error(f"❌ Erro ao extrair tabela {table_index+1}: {e}")
+            self.logger.error(f"Erro ao extrair tabela {table_index+1}: {e}")
         
         return grades
     
@@ -242,11 +242,11 @@ class GradeExtractor:
                 
                 organized[period].append(grade)
             
-            self.logger.info(f"📅 Notas organizadas em {len(organized)} período(s)")
+            self.logger.info(f"Notas organizadas em {len(organized)} período(s)")
             return organized
             
         except Exception as e:
-            self.logger.error(f"❌ Erro ao organizar por semestre: {e}")
+            self.logger.error(f"Erro ao organizar por semestre: {e}")
             return {"Periodo_Unico": grades}
     
     def _identify_period(self, grade: Dict[str, Any]) -> str:
