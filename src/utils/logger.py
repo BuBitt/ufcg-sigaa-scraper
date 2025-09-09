@@ -32,7 +32,7 @@ class PerformanceLogger:
             operation: Nome da operação sendo medida
         """
         self.timers[operation] = time.time()
-    self.logger.debug(f"Timer iniciado: {operation}")
+        self.logger.debug(f"Timer iniciado: {operation}")
     
     def end_timer(self, operation: str) -> float:
         """
