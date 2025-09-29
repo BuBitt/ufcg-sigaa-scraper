@@ -168,6 +168,26 @@ class TelegramNotifier:
             str: Mensagem formatada
         """
         try:
+            resultado_messages: List[str] = []
+            for change in changes:
+                discipline = None
+                detail = change
+
+                if ":" in change:
+                    discipline_part, detail_part = change.split(":", 1)
+                    discipline = discipline_part.strip()
+                    detail = detail_part.strip()
+
+                if "resultado" in detail.lower():
+                    discipline_display = self._apply_discipline_replacement(
+                        discipline if discipline else "Disciplina"
+                    )
+                    resultado_messages.append(f"A Materia {discipline_display} Fechou!")
+
+            if resultado_messages:
+                # Retorna mensagem específica para mudanças de resultado
+                return "\n".join(dict.fromkeys(resultado_messages))
+
             header = "🎓 *Novas notas detectadas no SIGAA!*\n\n"
             
             # Extrair disciplinas únicas
