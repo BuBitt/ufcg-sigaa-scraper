@@ -168,7 +168,7 @@ class TelegramNotifier:
             str: Mensagem formatada
         """
         try:
-            resultado_messages: List[str] = []
+            status_messages: List[str] = []
             for change in changes:
                 discipline = None
                 detail = change
@@ -178,15 +178,17 @@ class TelegramNotifier:
                     discipline = discipline_part.strip()
                     detail = detail_part.strip()
 
-                if "resultado" in detail.lower():
+                if any(keyword in detail.lower() for keyword in ("resultado", "situação", "situacao")):
                     discipline_display = self._apply_discipline_replacement(
                         discipline if discipline else "Disciplina"
                     )
-                    resultado_messages.append(f"A Materia {discipline_display} Fechou!")
+                    message = f"🏁 *A Matéria {discipline_display} fechou!*"
+                    status_messages.append(message)
 
-            if resultado_messages:
+            if status_messages:
                 # Retorna mensagem específica para mudanças de resultado
-                return "\n".join(dict.fromkeys(resultado_messages))
+                unique_messages = list(dict.fromkeys(status_messages))
+                return "\n\n".join(unique_messages)
 
             header = "🎓 *Novas notas detectadas no SIGAA!*\n\n"
             
@@ -297,18 +299,68 @@ class TelegramNotifier:
                     # Aplicar substituição se disponível
                     discipline_display = self._apply_discipline_replacement(discipline)
                     
-                    # Verificar se contém informações de nota
-                    if "→" in detail:
+                    detail_lower = detail.lower()
+                    if "→" in detail and not any(
+                        keyword in detail_lower for keyword in ("situação", "situacao", "resultado")
+                    ):
                         # Mudança de nota (antes → depois)
                         formatted_detail = self._format_grade_change(detail)
                         return f"*{discipline_display}*: {formatted_detail}"
-                    elif "Nova nota" in detail or "Nota" in detail or "Resultado" in detail:
-                        # Nova nota ou resultado
+
+                    segments = [segment.strip() for segment in detail.split(";") if segment.strip()]
+                    field_lines: List[str] = []
+
+                    for segment in segments:
+                        key = None
+                        value = None
+
+                        if ":" in segment:
+                            key_part, value_part = segment.split(":", 1)
+                            key = key_part.strip()
+                            value = value_part.strip()
+                        else:
+                            value = segment.strip()
+
+                        key_lower = key.lower() if key else ""
+
+                        if key_lower and ("situação" in key_lower or "situacao" in key_lower):
+                            status_value = self._extract_status_from_detail(segment)
+                            if not status_value and value:
+                                status_value = self._extract_final_value(value)
+                            if status_value:
+                                field_lines.append(f"  - Situação: {status_value}")
+                            continue
+
+                        if key_lower and "resultado" in key_lower:
+                            result_value = self._extract_status_from_detail(segment)
+                            if not result_value and value:
+                                result_value = self._extract_final_value(value)
+                            if result_value:
+                                result_value = self._highlight_grades_in_text(result_value)
+                                field_lines.append(f"  - Resultado: {result_value}")
+                            continue
+
+                        if key and value:
+                            formatted_value = self._highlight_grades_in_text(self._extract_final_value(value) or value)
+                            field_lines.append(f"  - {key}: {formatted_value}")
+                        elif segment:
+                            field_lines.append(f"  - {self._highlight_grades_in_text(segment)}")
+
+                    if field_lines:
+                        formatted_fields = []
+                        for idx, line in enumerate(field_lines):
+                            suffix = "." if idx == len(field_lines) - 1 else ";"
+                            formatted_fields.append(f"{line}{suffix}")
+                        formatted_body = "\n".join(formatted_fields)
+                        return f"*{discipline_display}*:\n{formatted_body}"
+
+                    if "nova nota" in detail_lower or "nota" in detail_lower:
+                        # Nova nota
                         formatted_detail = self._highlight_grades_in_text(detail)
                         return f"*{discipline_display}*: {formatted_detail}"
-                    else:
-                        # Outras mudanças
-                        return f"*{discipline_display}*: {detail}"
+
+                    # Outras mudanças
+                    return f"*{discipline_display}*: {detail}"
             
             # Se não há dois pontos, verificar se contém números (notas)
             if any(char.isdigit() for char in change):
@@ -370,6 +422,58 @@ class TelegramNotifier:
             
         except Exception:
             return text
+
+    def _extract_final_value(self, text: str) -> Optional[str]:
+        """Extrai o valor final relevante de um fragmento de texto indicando mudança."""
+        try:
+            import re
+
+            if not text:
+                return None
+
+            candidate = text.strip()
+            if not candidate:
+                return None
+
+            if "→" in candidate:
+                candidate = candidate.split("→")[-1].strip()
+
+            candidate = re.sub(
+                r"(?i)^(resultado|situação|situacao|status)\s*[:\-]?\s*",
+                "",
+                candidate,
+            )
+
+            candidate = re.sub(
+                r"(?i)^(foi|ficou|passou|passando|alterado|alterada|para|como)\s+",
+                "",
+                candidate,
+            )
+
+            candidate = candidate.strip("-: ")
+
+            return candidate or None
+
+        except Exception:
+            return None
+
+    def _extract_status_from_detail(self, detail: str) -> Optional[str]:
+        """
+        Extrai o valor final (após alteração) de campos como Situação/Resultado.
+        Retorna apenas o novo estado para uso nas mensagens.
+        """
+        try:
+            candidate = self._extract_final_value(detail)
+            if not candidate:
+                return None
+
+            if candidate.lower() in {"alterado", "alterada"}:
+                return None
+
+            return candidate
+
+        except Exception:
+            return None
     
     def _send_message(self, chat_id: str, message: str) -> bool:
         """

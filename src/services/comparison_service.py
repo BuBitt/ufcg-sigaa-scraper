@@ -235,7 +235,8 @@ class ComparisonService:
             # Campos que indicam notas/valores importantes
             important_fields = [
                 'Nota', 'Média', 'Resultado', 'Conceito',
-                'Nota Final', 'Media Final', '_nota_extraida'
+                'Nota Final', 'Media Final', '_nota_extraida',
+                'Situação', 'Situacao', 'Status'
             ]
             
             # Verificar mudanças em campos importantes
@@ -274,7 +275,7 @@ class ComparisonService:
         """
         try:
             # Procurar por campos de nota principais
-            grade_fields = ['Resultado', 'Nota', 'Média']
+            grade_fields = ['Resultado', 'Nota', 'Média', 'Situação', 'Situacao', 'Status']
             for field in grade_fields:
                 if field in record and record[field] and record[field] != "--" and record[field].strip():
                     return f"{section_key}: {field} {record[field]}"
