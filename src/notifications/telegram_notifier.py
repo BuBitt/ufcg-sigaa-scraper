@@ -182,7 +182,7 @@ class TelegramNotifier:
                     discipline_display = self._apply_discipline_replacement(
                         discipline if discipline else "Disciplina"
                     )
-                    message = f"🏁 *A Matéria {discipline_display} fechou!*"
+                    message = f"🏁 *A Matéria {discipline_display} foi consolidada!*"
                     status_messages.append(message)
 
             if status_messages:
