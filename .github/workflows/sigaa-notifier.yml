@@ -6,7 +6,7 @@ on:
     # BRT = UTC-3, então 6h BRT = 9h UTC e 23h BRT = 2h UTC do dia seguinte
     #- cron: "*/45 9-23 * * *" # 9h às 23h UTC (6h às 20h BRT)
     #- cron: "*/45 0-2 * * *" # 0h às 2h UTC (21h às 23h BRT do dia anterior)
-    - cron: "0 12 * * *"
+    - cron: "0 12 * * 1"
   workflow_dispatch:
 
 jobs:
