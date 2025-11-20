@@ -2,11 +2,10 @@ name: SIGAA Grade Scraper
 
 on:
   schedule:
-    # Executa de hora em hora das 6h às 23h BRT (9h às 02h UTC)
-    # BRT = UTC-3, então 6h BRT = 9h UTC e 23h BRT = 2h UTC do dia seguinte
-    #- cron: "*/45 9-23 * * *" # 9h às 23h UTC (6h às 20h BRT)
-    #- cron: "*/45 0-2 * * *" # 0h às 2h UTC (21h às 23h BRT do dia anterior)
-    - cron: "0 12 * * 1"
+    # 08h–23h BRT → 11h–23h UTC
+    - cron: "0 11-23 * * *"
+    # 00h–02h UTC (correspondente a 21h–23h BRT do dia anterior)
+    - cron: "0 0-2 * * *"
   workflow_dispatch:
 
 jobs:
