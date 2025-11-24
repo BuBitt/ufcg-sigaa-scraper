@@ -2,29 +2,29 @@
 
 Um scraper moderno e robusto para extrair notas do Sistema Integrado de Gestão de Atividades Acadêmicas (SIGAA) da UFCG.
 
-## 📋 Funcionalidades
+## Funcionalidades
 
-- ✅ **Duas estratégias de extração configuráveis**
+- **Duas estratégias de extração configuráveis**
   - `menu_ensino`: Acesso direto via menu "Ensino > Consultar Minhas Notas" (mais rápido)
   - `materia_individual`: Navegação matéria por matéria (método original)
 
-- ✅ **Arquitetura modular e robusta**
+- **Arquitetura modular e robusta**
   - Serviços especializados para cada funcionalidade
   - Sistema de logging avançado com medição de performance
   - Cache inteligente para evitar reprocessamento
   - Comparação automática de mudanças
 
-- ✅ **Notificações inteligentes**
+- **Notificações inteligentes**
   - Integração com Telegram para alertas de novas notas
   - Detecção automática de mudanças
   - Formatação clara das notificações
 
-- ✅ **Exportação flexível**
+- **Exportação flexível**
   - Formato JSON estruturado
   - Opção de exportação para CSV
   - Backup automático de dados
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 ```
 src/
@@ -44,7 +44,7 @@ src/
     └── logger.py   # Sistema de logging avançado
 ```
 
-## 🚀 Instalação
+## Instalação
 
 ### 1. Clone o repositório
 ```bash
@@ -82,7 +82,7 @@ TELEGRAM_CHAT_ID=seu_chat_id
 EXTRACTION_METHOD=menu_ensino  # ou materia_individual
 ```
 
-## 🎯 Como usar
+## Como usar
 
 ### Execução básica
 ```bash
@@ -101,12 +101,12 @@ EXTRACTION_METHOD=materia_individual python main.py
 
 ### Métodos de extração
 
-#### 🎯 menu_ensino (Recomendado)
+#### menu_ensino (Recomendado)
 - **Vantagem**: Mais rápido e direto
 - **Como funciona**: Navega diretamente para "Ensino > Consultar Minhas Notas"
 - **Ideal para**: Uso regular e automático
 
-#### 🔍 materia_individual
+#### materia_individual
 - **Vantagem**: Mais detalhado, acesso matéria por matéria
 - **Como funciona**: Navega pelo menu lateral, entrando em cada disciplina
 - **Ideal para**: Quando precisa de informações específicas por disciplina
@@ -118,7 +118,7 @@ EXTRACTION_METHOD=materia_individual python main.py
 3. Encontre seu Chat ID (pode usar @userinfobot)
 4. Configure no arquivo `.env`
 
-## 🧪 Testes
+## Testes
 
 O projeto inclui uma suíte completa de testes:
 
@@ -138,7 +138,7 @@ python tests/run_tests.py test_integration
 - `test_services.py`: Testes dos serviços principais
 - `test_integration.py`: Testes de integração do fluxo completo
 
-## 📊 Saída de dados
+## Saída de dados
 
 ### Cache (grades_cache.json)
 ```json
@@ -156,60 +156,13 @@ python tests/run_tests.py test_integration
 
 ### Logs estruturados
 ```
-2024-01-01 10:00:00 | INFO     | auth_service         | login               :45   | 🔐 Realizando login no SIGAA
-2024-01-01 10:00:02 | INFO     | grade_extractor      | extract_grades      :67   | 📊 Iniciando extração de notas
+2024-01-01 10:00:00 | INFO     | auth_service         | login               :45   | Realizando login no SIGAA
+2024-01-01 10:00:02 | INFO     | grade_extractor      | extract_grades      :67   | Iniciando extração de notas
 ```
 
-## 🛠️ Desenvolvimento
-
-### Estrutura de commits
-- `feat:` nova funcionalidade
-- `fix:` correção de bug
-- `refactor:` refatoração de código
-- `test:` adição ou correção de testes
-- `docs:` atualização de documentação
-
-### Contribuindo
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`)
-3. Commit suas mudanças (`git commit -m 'feat: adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/nova-funcionalidade`)
-5. Abra um Pull Request
-
-## 📝 Changelog
-
-### v2.0.0 (Atual)
-- ✅ Refatoração completa da arquitetura
-- ✅ Implementação de padrão de serviços
-- ✅ Sistema de logging avançado
-- ✅ Dois métodos de extração configuráveis
-- ✅ Cache inteligente e comparação automática
-- ✅ Suíte completa de testes
-- ✅ Documentação abrangente
-
-### v1.x
-- Implementação básica com extração por matéria individual
-- Notificações básicas via Telegram
-- Cache simples em JSON
-
-## ⚠️ Limitações e considerações
+## Limitações e considerações
 
 - O scraper depende da estrutura HTML do SIGAA, que pode mudar
 - Requer credenciais válidas da UFCG
 - Taxa de requisições limitada para evitar sobrecarga do servidor
 - Testado especificamente com SIGAA da UFCG
-
-## 📞 Suporte
-
-- Para bugs ou sugestões, abra uma issue no GitHub
-- Para dúvidas sobre configuração, consulte a documentação
-- Para contribuições, siga o guia de desenvolvimento
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
-
----
-
-**⚡ Desenvolvido com foco em robustez, performance e manutenibilidade**
