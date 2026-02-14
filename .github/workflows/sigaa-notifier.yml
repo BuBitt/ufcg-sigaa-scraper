@@ -27,6 +27,22 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Cache grades data
+        uses: actions/cache@v4
+        with:
+          path: grades_cache.json
+          key: grades-cache-${{ github.run_id }}
+          restore-keys: |
+            grades-cache-
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -41,15 +57,7 @@ jobs:
         run: |
           playwright install chromium
 
-      - name: Download grades cache from previous workflow
-        id: download-grades-cache
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: grades-cache
-          path: .
-
-      - name: Debug - List downloaded files
+      - name: Initialize grades cache if not exists
         run: |
           if [ -f "grades_cache.json" ]; then
             echo "grades_cache.json exists, size: $(stat -c%s grades_cache.json) bytes"
@@ -79,13 +87,3 @@ jobs:
           exit_code=$?
           echo "Script exit code: $exit_code"
           exit $exit_code
-
-      - name: Upload grades cache for next workflow
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: grades-cache
-          path: grades_cache.json
-          retention-days: 90
-          overwrite: true
