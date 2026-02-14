@@ -216,3 +216,5 @@ go.work.sum
 notas_completas.csv
 grades_cache.json
 grades_cache.json.bak
+
+.python-version

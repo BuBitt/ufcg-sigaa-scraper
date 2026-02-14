@@ -2,10 +2,10 @@ name: SIGAA Grade Scraper
 
 on:
   schedule:
-    # 08h–23h BRT → 11h–23h UTC
-    - cron: "0 11-23 * * *"
-    # 00h–02h UTC (correspondente a 21h–23h BRT do dia anterior)
-    - cron: "0 0-2 * * *"
+    # 08h–23h BRT → 11h–23h UTC (a cada 45 minutos)
+    - cron: "*/45 11-23 * * *"
+    # 00h–02h UTC (correspondente a 21h–23h BRT do dia anterior, a cada 45 minutos)
+    - cron: "*/45 0-2 * * *"
   workflow_dispatch:
 
 jobs:
